@@ -19,9 +19,16 @@ struct RenderRequest {
 }
 
 fn is_night_time() -> bool {
-    let now = chrono::Local::now();
-    let hour = now.hour();
+    is_night_time_at(chrono::Local::now().hour())
+}
+
+fn is_night_time_at(hour: u32) -> bool {
     hour < 6 || hour >= 18
+}
+
+fn calculate_simulated_speed(elapsed: f32) -> i32 {
+    let sin_val = (elapsed / 2.0).sin();
+    10 + (60.0 + 60.0 * sin_val) as i32
 }
 
 fn main() -> Result<(), slint::PlatformError> {
@@ -154,11 +161,35 @@ fn main() -> Result<(), slint::PlatformError> {
     speed_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(20), move || {
         if let Some(ui) = ui_handle_speed.upgrade() {
             let elapsed = start_time.elapsed().as_secs_f32();
-            let sin_val = (elapsed / 2.0).sin();
-            let simulated_speed = 10 + (60.0 + 60.0 * sin_val) as i32;
+            let simulated_speed = calculate_simulated_speed(elapsed);
             ui.set_current_speed(simulated_speed);
         }
     });
 
     ui.run()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_night_time_at() {
+        assert!(is_night_time_at(0));   // Midnight
+        assert!(is_night_time_at(5));   // 5 AM
+        assert!(!is_night_time_at(6));  // 6 AM
+        assert!(!is_night_time_at(12)); // Noon
+        assert!(!is_night_time_at(17)); // 5 PM
+        assert!(is_night_time_at(18));  // 6 PM
+        assert!(is_night_time_at(23));  // 11 PM
+    }
+
+    #[test]
+    fn test_calculate_simulated_speed() {
+        let s0 = calculate_simulated_speed(0.0);
+        assert!(s0 >= 10 && s0 <= 130);
+        
+        let s_pi = calculate_simulated_speed(std::f32::consts::PI);
+        assert!(s_pi >= 10 && s_pi <= 130);
+    }
 }

@@ -413,3 +413,118 @@ fn add_linestring_to_pb(pb: &mut PathBuilder, coords: &[geo_types::Coord<f32>]) 
         pb.line_to(point.x, point.y);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use geo_types::Coord;
+
+    #[test]
+    fn test_add_polygon_to_pb() {
+        let mut pb = PathBuilder::new();
+        let coords = vec![
+            Coord { x: 0.0, y: 0.0 },
+            Coord { x: 10.0, y: 0.0 },
+            Coord { x: 10.0, y: 10.0 },
+            Coord { x: 0.0, y: 10.0 },
+        ];
+        add_polygon_to_pb(&mut pb, &coords);
+        let path = pb.finish();
+        assert!(path.is_some());
+    }
+
+    #[test]
+    fn test_add_linestring_to_pb() {
+        let mut pb = PathBuilder::new();
+        let coords = vec![
+            Coord { x: 0.0, y: 0.0 },
+            Coord { x: 10.0, y: 10.0 },
+        ];
+        add_linestring_to_pb(&mut pb, &coords);
+        let path = pb.finish();
+        assert!(path.is_some());
+    }
+
+    #[test]
+    fn test_render_map_empty_dimensions() {
+        let view = MapView {
+            center_x: 0,
+            center_y: 0,
+            zoom: 14,
+        };
+        let buffer = render_map(0.0, 0.0, 0, 0, &view, true);
+        assert_eq!(buffer.width(), 1);
+        assert_eq!(buffer.height(), 1);
+    }
+
+    #[test]
+    fn test_render_map_basic() {
+        let view = MapView {
+            center_x: 33756,
+            center_y: 21962,
+            zoom: 16,
+        };
+        let buffer = render_map(0.0, 0.0, 100, 100, &view, true);
+        assert_eq!(buffer.width(), 100);
+    }
+
+    #[test]
+    fn test_render_map_dark_vs_light() {
+        let view = MapView {
+            center_x: 33756,
+            center_y: 21962,
+            zoom: 16,
+        };
+        let mut buffer_dark = render_map(0.0, 0.0, 10, 10, &view, true);
+        let mut buffer_light = render_map(0.0, 0.0, 10, 10, &view, false);
+        // Buffers should be different (at least the background color)
+        assert_ne!(buffer_dark.make_mut_slice(), buffer_light.make_mut_slice());
+    }
+
+    #[test]
+    fn test_render_map_offsets() {
+        let view = MapView {
+            center_x: 33756,
+            center_y: 21962,
+            zoom: 16,
+        };
+        let mut buffer1 = render_map(0.0, 0.0, 50, 50, &view, true);
+        let mut buffer2 = render_map(10.0, 10.0, 50, 50, &view, true);
+        assert_ne!(buffer1.make_mut_slice(), buffer2.make_mut_slice());
+    }
+
+    #[test]
+    fn test_add_polygon_to_pb_empty() {
+        let mut pb = PathBuilder::new();
+        add_polygon_to_pb(&mut pb, &[]);
+        let path = pb.finish();
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn test_add_linestring_to_pb_empty() {
+        let mut pb = PathBuilder::new();
+        add_linestring_to_pb(&mut pb, &[]);
+        let path = pb.finish();
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn test_render_map_zoom_levels() {
+        let view = MapView {
+            center_x: 33756,
+            center_y: 21962,
+            zoom: 10,
+        };
+        let buffer = render_map(0.0, 0.0, 100, 100, &view, false);
+        assert_eq!(buffer.width(), 100);
+        
+        let view_high = MapView {
+            center_x: 33756,
+            center_y: 21962,
+            zoom: 18,
+        };
+        let buffer_high = render_map(0.0, 0.0, 100, 100, &view_high, false);
+        assert_eq!(buffer_high.width(), 100);
+    }
+}
