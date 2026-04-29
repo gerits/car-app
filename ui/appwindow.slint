@@ -1,0 +1,179 @@
+import "../assets/SpaceGrotesk-VariableFont_wght.ttf";
+import "../assets/SpaceGrotesk-Bold.ttf";
+
+export component AppWindow inherits Window {
+    title: "NFS Car Map Dashboard";
+    preferred-width: 800px;
+    preferred-height: 480px;
+    background: #0A0A0A; // Instrument Black
+
+    in property <image> map_bg;
+    in-out property <bool> is_dark_mode: true;
+    in-out property <int> current_speed: 75;
+    callback map_dragged(length, length);
+    callback toggle_theme();
+
+    property <length> display_size: min(root.width, root.height);
+
+    // Map Layer - Rendered as a square to fill the circular display
+    Image {
+        width: root.display_size;
+        height: root.display_size;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        source: root.map_bg;
+        image-fit: fill;
+    }
+
+    // Speed Arch
+    for i in 71 : Path {
+        property <int> speed: 10 + i * 2;
+        property <angle> angle: -120deg + (i / 70.0) * 240deg;
+        
+        property <length> r_outer: root.display_size / 2 * 0.96;
+        property <length> r_inner: r_outer - 12px;
+        
+        property <bool> is_div_20: Math.mod(speed, 20) == 0;
+        property <bool> is_div_10: Math.mod(speed, 10) == 0;
+        property <length> sw: is_div_20 ? 16px : (is_div_10 ? 6px : 1px);
+        property <length> hw: sw / 2;
+        
+        fill: root.is_dark_mode ? #F4F1E1 : #353535;
+        
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        
+        MoveTo {
+            x: (root.width / 2 + sin(angle) * r_inner - cos(angle) * hw) / 1px;
+            y: (root.height / 2 - cos(angle) * r_inner - sin(angle) * hw) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_inner + cos(angle) * hw) / 1px;
+            y: (root.height / 2 - cos(angle) * r_inner + sin(angle) * hw) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_outer + cos(angle) * hw) / 1px;
+            y: (root.height / 2 - cos(angle) * r_outer + sin(angle) * hw) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_outer - cos(angle) * hw) / 1px;
+            y: (root.height / 2 - cos(angle) * r_outer - sin(angle) * hw) / 1px;
+        }
+        Close {}
+    }
+    
+
+    // Needle
+    Path {
+        property <angle> angle: -120deg + (root.current_speed - 10) / 140.0 * 240deg;
+        property <length> r_in: root.display_size / 2 * 0.68;
+        property <length> r_out: root.display_size / 2 * 0.96 - 12px; 
+        
+        fill: #FF8C00; // NFS Glow Orange
+        
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        
+        MoveTo {
+            x: (root.width / 2 + sin(angle) * r_in - cos(angle) * 6px) / 1px;
+            y: (root.height / 2 - cos(angle) * r_in - sin(angle) * 6px) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_out - cos(angle) * 2px) / 1px;
+            y: (root.height / 2 - cos(angle) * r_out - sin(angle) * 2px) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * (r_out + 8px)) / 1px;
+            y: (root.height / 2 - cos(angle) * (r_out + 8px)) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_out + cos(angle) * 2px) / 1px;
+            y: (root.height / 2 - cos(angle) * r_out + sin(angle) * 2px) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + sin(angle) * r_in + cos(angle) * 6px) / 1px;
+            y: (root.height / 2 - cos(angle) * r_in + sin(angle) * 6px) / 1px;
+        }
+        Close {}
+    }
+
+    // Speed Numbers
+    for i in 7 : Text {
+        property <int> speed: 20 + i * 20;
+        property <int> dash_idx: (speed - 10) / 2;
+        property <angle> angle: -120deg + (dash_idx / 70.0) * 240deg;
+        property <length> r_text: root.display_size / 2 * 0.78;
+        
+        text: speed;
+        font-size: 50px;
+        font-weight: 300;
+        font-family: "Space Grotesk";
+        color: root.is_dark_mode ? #F4F1E1 : #353535;
+        
+        x: root.width / 2 + sin(angle) * r_text - self.width / 2;
+        y: root.height / 2 - cos(angle) * r_text - self.height / 2;
+        
+        // Bottom faces center (angle), except first and last face outwards (+180deg)
+        transform-rotation: (i == 0 || i == 6) ? angle + 180deg : angle;
+    }
+
+
+
+    // Circular Mask - Robust version covering the full screen
+    Rectangle {
+        width: 10000px; // Extremely large to ensure external masking
+        height: self.width;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-radius: self.width / 2;
+        border-width: (self.width - root.display_size) / 2;
+        border-color: #0A0A0A; // Match background
+    }
+
+    TouchArea {
+        property <length> start_x;
+        property <length> start_y;
+        
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                self.start_x = self.mouse-x;
+                self.start_y = self.mouse-y;
+            }
+        }
+        
+        moved => {
+            let dx = self.mouse-x - self.start_x;
+            let dy = self.mouse-y - self.start_y;
+            self.start_x = self.mouse-x;
+            self.start_y = self.mouse-y;
+            root.map_dragged(dx, dy);
+        }
+    }
+
+    // Debug Theme Switcher (Visible only in dev)
+    TouchArea {
+        x: 20px;
+        y: 20px;
+        width: 100px;
+        height: 40px;
+        clicked => { root.toggle_theme() }
+        
+        Rectangle {
+            background: root.is_dark_mode ? rgba(255, 255, 255, 0.1) : rgba(0, 0, 0, 0.1);
+            border-color: root.is_dark_mode ? rgba(255, 255, 255, 0.3) : rgba(0, 0, 0, 0.3);
+            border-width: 1px;
+            border-radius: 4px;
+            
+            Text {
+                text: root.is_dark_mode ? "DARK" : "LIGHT";
+                vertical-alignment: center;
+                horizontal-alignment: center;
+                color: root.is_dark_mode ? #FFFFFF : #000000;
+            }
+        }
+    }
+}
