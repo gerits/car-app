@@ -14,15 +14,23 @@ export component AppWindow inherits Window {
     callback toggle_theme();
 
     property <length> display_size: min(root.width, root.height);
+    property <color> theme_foreground: root.is_dark_mode ? #F4F1E1 : #353535;
 
-    // Map Layer - Rendered as a square to fill the circular display
-    Image {
+    // Map Layer - Clipped to circular display
+    Rectangle {
         width: root.display_size;
         height: root.display_size;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        source: root.map_bg;
-        image-fit: fill;
+        border-radius: self.width / 2;
+        clip: true;
+
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.map_bg;
+            image-fit: fill;
+        }
     }
 
     // Speed Arch
@@ -38,7 +46,7 @@ export component AppWindow inherits Window {
         property <length> sw: is_div_20 ? 16px : (is_div_10 ? 6px : 1px);
         property <length> hw: sw / 2;
         
-        fill: root.is_dark_mode ? #F4F1E1 : #353535;
+        fill: root.theme_foreground;
         
         width: root.width;
         height: root.height;
@@ -67,7 +75,7 @@ export component AppWindow inherits Window {
 
     // Needle
     Path {
-        property <angle> angle: -120deg + (root.current_speed - 10) / 140.0 * 240deg;
+        property <angle> needle_angle: -120deg + (Math.max(10, Math.min(150, root.current_speed)) - 10) / 140.0 * 240deg;
         property <length> r_in: root.display_size / 2 * 0.68;
         property <length> r_out: root.display_size / 2 * 0.96 - 12px; 
         
@@ -78,25 +86,27 @@ export component AppWindow inherits Window {
         viewbox-width: root.width / 1px;
         viewbox-height: root.height / 1px;
         
+        transform-rotation: self.needle_angle;
+        
         MoveTo {
-            x: (root.width / 2 + sin(angle) * r_in - cos(angle) * 6px) / 1px;
-            y: (root.height / 2 - cos(angle) * r_in - sin(angle) * 6px) / 1px;
+            x: (root.width / 2 - 6px) / 1px;
+            y: (root.height / 2 - r_in) / 1px;
         }
         LineTo {
-            x: (root.width / 2 + sin(angle) * r_out - cos(angle) * 2px) / 1px;
-            y: (root.height / 2 - cos(angle) * r_out - sin(angle) * 2px) / 1px;
+            x: (root.width / 2 - 2px) / 1px;
+            y: (root.height / 2 - r_out) / 1px;
         }
         LineTo {
-            x: (root.width / 2 + sin(angle) * (r_out + 8px)) / 1px;
-            y: (root.height / 2 - cos(angle) * (r_out + 8px)) / 1px;
+            x: (root.width / 2) / 1px;
+            y: (root.height / 2 - r_out - 8px) / 1px;
         }
         LineTo {
-            x: (root.width / 2 + sin(angle) * r_out + cos(angle) * 2px) / 1px;
-            y: (root.height / 2 - cos(angle) * r_out + sin(angle) * 2px) / 1px;
+            x: (root.width / 2 + 2px) / 1px;
+            y: (root.height / 2 - r_out) / 1px;
         }
         LineTo {
-            x: (root.width / 2 + sin(angle) * r_in + cos(angle) * 6px) / 1px;
-            y: (root.height / 2 - cos(angle) * r_in + sin(angle) * 6px) / 1px;
+            x: (root.width / 2 + 6px) / 1px;
+            y: (root.height / 2 - r_in) / 1px;
         }
         Close {}
     }
@@ -109,10 +119,10 @@ export component AppWindow inherits Window {
         property <length> r_text: root.display_size / 2 * 0.78;
         
         text: speed;
-        font-size: 50px;
+        font-size: 60px;
         font-weight: 300;
         font-family: "Space Grotesk";
-        color: root.is_dark_mode ? #F4F1E1 : #353535;
+        color: root.theme_foreground;
         
         x: root.width / 2 + sin(angle) * r_text - self.width / 2;
         y: root.height / 2 - cos(angle) * r_text - self.height / 2;
@@ -122,17 +132,6 @@ export component AppWindow inherits Window {
     }
 
 
-
-    // Circular Mask - Robust version covering the full screen
-    Rectangle {
-        width: 10000px; // Extremely large to ensure external masking
-        height: self.width;
-        x: (root.width - self.width) / 2;
-        y: (root.height - self.height) / 2;
-        border-radius: self.width / 2;
-        border-width: (self.width - root.display_size) / 2;
-        border-color: #0A0A0A; // Match background
-    }
 
     TouchArea {
         property <length> start_x;
