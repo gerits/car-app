@@ -1,12 +1,12 @@
-use std::rc::Rc;
+use chrono::Timelike;
+use slint::ComponentHandle;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
-use slint::ComponentHandle;
-use chrono::Timelike;
 
 mod map_renderer;
-use map_renderer::{render_map, MapView};
+use map_renderer::{MapView, render_map};
 
 slint::include_modules!();
 
@@ -23,7 +23,7 @@ fn is_night_time() -> bool {
 }
 
 fn is_night_time_at(hour: u32) -> bool {
-    hour < 6 || hour >= 18
+    !(6..18).contains(&hour)
 }
 
 fn calculate_simulated_speed(elapsed: f32) -> i32 {
@@ -38,13 +38,13 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let initial_is_dark = is_night_time();
     ui.set_is_dark_mode(initial_is_dark);
-    
+
     let offset_x = Rc::new(RefCell::new(0.0f32));
     let offset_y = Rc::new(RefCell::new(0.0f32));
 
     // Background rendering setup
     let (tx, rx) = mpsc::channel::<RenderRequest>();
-    
+
     let ui_handle_thread = ui.as_weak();
     thread::spawn(move || {
         while let Ok(req) = rx.recv() {
@@ -53,20 +53,20 @@ fn main() -> Result<(), slint::PlatformError> {
             while let Ok(next_req) = rx.try_recv() {
                 latest_req = next_req;
             }
-            
+
             let buffer = render_map(
-                latest_req.offset_x, 
-                latest_req.offset_y, 
-                latest_req.width, 
-                latest_req.height, 
+                latest_req.offset_x,
+                latest_req.offset_y,
+                latest_req.width,
+                latest_req.height,
                 &MapView {
                     center_x: 33756,
                     center_y: 21962,
                     zoom: 16,
                 },
-                latest_req.is_dark
+                latest_req.is_dark,
             );
-            
+
             let ui_handle_inner = ui_handle_thread.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_handle_inner.upgrade() {
@@ -90,11 +90,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let offset_x_clone = offset_x.clone();
     let offset_y_clone = offset_y.clone();
     let ui_handle_drag = ui.as_weak();
-    
+
     ui.on_map_dragged(move |dx, dy| {
         *offset_x_clone.borrow_mut() += dx;
         *offset_y_clone.borrow_mut() += dy;
-        
+
         if let Some(ui) = ui_handle_drag.upgrade() {
             let sz = ui.window().size();
             let d_sz = sz.width.min(sz.height);
@@ -116,7 +116,7 @@ fn main() -> Result<(), slint::PlatformError> {
         if let Some(ui) = ui_handle_toggle.upgrade() {
             let next_dark = !ui.get_is_dark_mode();
             ui.set_is_dark_mode(next_dark);
-            
+
             let sz = ui.window().size();
             let d_sz = sz.width.min(sz.height);
             let _ = tx_toggle.send(RenderRequest {
@@ -137,34 +137,42 @@ fn main() -> Result<(), slint::PlatformError> {
     let offset_y_resize = offset_y.clone();
 
     let resize_timer = slint::Timer::default();
-    resize_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(50), move || {
-        if let Some(ui) = ui_handle_resize.upgrade() {
-            let sz = ui.window().size();
-            if *last_size.borrow() != sz {
-                *last_size.borrow_mut() = sz;
-                let d_sz = sz.width.min(sz.height);
-                let _ = tx_resize.send(RenderRequest {
-                    offset_x: *offset_x_resize.borrow(),
-                    offset_y: *offset_y_resize.borrow(),
-                    width: d_sz,
-                    height: d_sz,
-                    is_dark: ui.get_is_dark_mode(),
-                });
+    resize_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(50),
+        move || {
+            if let Some(ui) = ui_handle_resize.upgrade() {
+                let sz = ui.window().size();
+                if *last_size.borrow() != sz {
+                    *last_size.borrow_mut() = sz;
+                    let d_sz = sz.width.min(sz.height);
+                    let _ = tx_resize.send(RenderRequest {
+                        offset_x: *offset_x_resize.borrow(),
+                        offset_y: *offset_y_resize.borrow(),
+                        width: d_sz,
+                        height: d_sz,
+                        is_dark: ui.get_is_dark_mode(),
+                    });
+                }
             }
-        }
-    });
-    
+        },
+    );
+
     // Speed simulation timer
     let ui_handle_speed = ui.as_weak();
     let speed_timer = slint::Timer::default();
     let start_time = std::time::Instant::now();
-    speed_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(20), move || {
-        if let Some(ui) = ui_handle_speed.upgrade() {
-            let elapsed = start_time.elapsed().as_secs_f32();
-            let simulated_speed = calculate_simulated_speed(elapsed);
-            ui.set_current_speed(simulated_speed);
-        }
-    });
+    speed_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(20),
+        move || {
+            if let Some(ui) = ui_handle_speed.upgrade() {
+                let elapsed = start_time.elapsed().as_secs_f32();
+                let simulated_speed = calculate_simulated_speed(elapsed);
+                ui.set_current_speed(simulated_speed);
+            }
+        },
+    );
 
     ui.run()
 }
@@ -175,20 +183,20 @@ mod tests {
 
     #[test]
     fn test_is_night_time_at() {
-        assert!(is_night_time_at(0));   // Midnight
-        assert!(is_night_time_at(5));   // 5 AM
-        assert!(!is_night_time_at(6));  // 6 AM
+        assert!(is_night_time_at(0)); // Midnight
+        assert!(is_night_time_at(5)); // 5 AM
+        assert!(!is_night_time_at(6)); // 6 AM
         assert!(!is_night_time_at(12)); // Noon
         assert!(!is_night_time_at(17)); // 5 PM
-        assert!(is_night_time_at(18));  // 6 PM
-        assert!(is_night_time_at(23));  // 11 PM
+        assert!(is_night_time_at(18)); // 6 PM
+        assert!(is_night_time_at(23)); // 11 PM
     }
 
     #[test]
     fn test_calculate_simulated_speed() {
         let s0 = calculate_simulated_speed(0.0);
         assert!(s0 >= 10 && s0 <= 130);
-        
+
         let s_pi = calculate_simulated_speed(std::f32::consts::PI);
         assert!(s_pi >= 10 && s_pi <= 130);
     }

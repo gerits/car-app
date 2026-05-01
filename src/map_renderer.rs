@@ -1,14 +1,14 @@
 use geo_types::Geometry;
+use log::error;
+use lru::LruCache;
+use mvt_reader::feature::Value;
 use pmtiles2::PMTiles;
 use slint::{Rgba8Pixel, SharedPixelBuffer};
-use mvt_reader::feature::Value;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
-use tiny_skia::{Color, Paint, PathBuilder, PixmapMut, Stroke, Transform};
-use lru::LruCache;
 use std::num::NonZeroUsize;
-use log::error;
+use tiny_skia::{Color, Paint, PathBuilder, PixmapMut, Stroke, Transform};
 
 use std::sync::Arc;
 
@@ -42,23 +42,27 @@ pub struct MapView {
     pub zoom: u8,
 }
 
-pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &MapView, is_dark: bool) -> SharedPixelBuffer<Rgba8Pixel> {
+pub fn render_map(
+    offset_x: f32,
+    offset_y: f32,
+    width: u32,
+    height: u32,
+    view: &MapView,
+    is_dark: bool,
+) -> SharedPixelBuffer<Rgba8Pixel> {
     if width == 0 || height == 0 {
         return SharedPixelBuffer::<Rgba8Pixel>::new(1, 1);
     }
-    
+
     let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
     let mut pixmap = {
         let pixels = buffer.make_mut_slice();
         let bytes = unsafe {
-            std::slice::from_raw_parts_mut(
-                pixels.as_mut_ptr() as *mut u8,
-                pixels.len() * 4
-            )
+            std::slice::from_raw_parts_mut(pixels.as_mut_ptr() as *mut u8, pixels.len() * 4)
         };
         PixmapMut::from_bytes(bytes, width, height).unwrap()
     };
-    
+
     // NFS_COLOR_MAP_LAND: Dark: 0x1C1C1C, Light: 0xE8E8E8
     if is_dark {
         pixmap.fill(Color::from_rgba8(0x1C, 0x1C, 0x1C, 255));
@@ -76,8 +80,10 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
         paint_water.set_color_rgba8(0xC4, 0xD3, 0xDF, 255);
     }
     paint_water.anti_alias = true;
-    let mut stroke_water = Stroke::default();
-    stroke_water.width = 32.0; // 1.0 at scale 1 (128px tile) = 1.0 * (4096/128)
+    let stroke_water = Stroke {
+        width: 32.0, // 1.0 at scale 1 (128px tile) = 1.0 * (4096/128)
+        ..Default::default()
+    };
 
     // NFS_COLOR_MAP_ROAD_MAJOR: Dark: 0x353535, Light: 0xFFFFFF
     let mut paint_road_major = Paint::default();
@@ -87,10 +93,12 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
         paint_road_major.set_color_rgba8(0xFF, 0xFF, 0xFF, 255);
     }
     paint_road_major.anti_alias = true;
-    let mut stroke_road_major = Stroke::default();
-    stroke_road_major.width = 64.0; // 2.0 at scale 1
-    stroke_road_major.line_cap = tiny_skia::LineCap::Round;
-    stroke_road_major.line_join = tiny_skia::LineJoin::Round;
+    let stroke_road_major = Stroke {
+        width: 64.0, // 2.0 at scale 1
+        line_cap: tiny_skia::LineCap::Round,
+        line_join: tiny_skia::LineJoin::Round,
+        ..Default::default()
+    };
 
     // NFS_COLOR_MAP_ROAD_MINOR: Dark: 0x1C1B1B, Light: 0xF5F5F5
     let mut paint_road_minor = Paint::default();
@@ -100,10 +108,12 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
         paint_road_minor.set_color_rgba8(0xF5, 0xF5, 0xF5, 255);
     }
     paint_road_minor.anti_alias = true;
-    let mut stroke_road_minor = Stroke::default();
-    stroke_road_minor.width = 32.0; // 1.0 at scale 1
-    stroke_road_minor.line_cap = tiny_skia::LineCap::Round;
-    stroke_road_minor.line_join = tiny_skia::LineJoin::Round;
+    let stroke_road_minor = Stroke {
+        width: 32.0, // 1.0 at scale 1
+        line_cap: tiny_skia::LineCap::Round,
+        line_join: tiny_skia::LineJoin::Round,
+        ..Default::default()
+    };
 
     // POI Primary: Dark: 0xC9C7B8 (Cream), Light: 0x353535 (Tech Grey)
     let mut paint_poi = Paint::default();
@@ -129,10 +139,12 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
             let scaled_offset_y = offset_y * scale;
 
             let min_dx = ((-scaled_offset_x - tile_size - start_x) / tile_size).floor() as i32 - 1;
-            let max_dx = ((width as f32 - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
+            let max_dx =
+                ((width as f32 - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
 
             let min_dy = ((-scaled_offset_y - tile_size - start_y) / tile_size).floor() as i32 - 1;
-            let max_dy = ((height as f32 - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
+            let max_dy =
+                ((height as f32 - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
 
             for dx in min_dx..=max_dx {
                 for dy in min_dy..=max_dy {
@@ -144,9 +156,8 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
                     let screen_origin_y = scaled_offset_y + start_y + (dy as f32 * tile_size);
                     let transform = Transform::from_translate(screen_origin_x, screen_origin_y);
 
-                    let cached_tile = TILE_CACHE.with(|cache| {
-                        cache.borrow_mut().get(&(tile_x, tile_y, zoom)).cloned()
-                    });
+                    let cached_tile = TILE_CACHE
+                        .with(|cache| cache.borrow_mut().get(&(tile_x, tile_y, zoom)).cloned());
 
                     let tile_paths = if let Some(tile) = cached_tile {
                         tile
@@ -163,8 +174,8 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
                         if let Ok(Some(tile_data)) = pm.get_tile(tile_x, tile_y, zoom) {
                             let mut d = flate2::read::GzDecoder::new(tile_data.as_slice());
                             let mut decompressed = Vec::new();
-                            if d.read_to_end(&mut decompressed).is_ok() {
-                                if let Ok(reader) = mvt_reader::Reader::new(decompressed) {
+                            if d.read_to_end(&mut decompressed).is_ok()
+                                && let Ok(reader) = mvt_reader::Reader::new(decompressed) {
                                     let mut water_fill_pb = PathBuilder::new();
                                     let mut water_stroke_pb = PathBuilder::new();
                                     let mut road_major_pb = PathBuilder::new();
@@ -178,58 +189,120 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
                                             if let Ok(features) = reader.get_features(i) {
                                                 for f in features {
                                                     match f.get_geometry() {
-                                                        Geometry::Polygon(poly) => add_polygon_to_pb(&mut water_fill_pb, poly.exterior().0.as_slice()),
-                                                        Geometry::MultiPolygon(mpoly) => {
-                                                            for poly in mpoly { add_polygon_to_pb(&mut water_fill_pb, poly.exterior().0.as_slice()); }
+                                                        Geometry::Polygon(poly) => {
+                                                            add_polygon_to_pb(
+                                                                &mut water_fill_pb,
+                                                                poly.exterior().0.as_slice(),
+                                                            )
                                                         }
-                                                        Geometry::LineString(ls) => add_linestring_to_pb(&mut water_stroke_pb, ls.0.as_slice()),
+                                                        Geometry::MultiPolygon(mpoly) => {
+                                                            for poly in mpoly {
+                                                                add_polygon_to_pb(
+                                                                    &mut water_fill_pb,
+                                                                    poly.exterior().0.as_slice(),
+                                                                );
+                                                            }
+                                                        }
+                                                        Geometry::LineString(ls) => {
+                                                            add_linestring_to_pb(
+                                                                &mut water_stroke_pb,
+                                                                ls.0.as_slice(),
+                                                            )
+                                                        }
                                                         Geometry::MultiLineString(mls) => {
-                                                            for ls in mls { add_linestring_to_pb(&mut water_stroke_pb, ls.0.as_slice()); }
+                                                            for ls in mls {
+                                                                add_linestring_to_pb(
+                                                                    &mut water_stroke_pb,
+                                                                    ls.0.as_slice(),
+                                                                );
+                                                            }
                                                         }
                                                         _ => {}
                                                     }
                                                 }
                                             }
-                                        } else if layer_name == "roads" || layer_name == "transportation" || layer_name == "highway" || layer_name.contains("road") {
+                                        } else if layer_name == "roads"
+                                            || layer_name == "transportation"
+                                            || layer_name == "highway"
+                                            || layer_name.contains("road")
+                                        {
                                             if let Ok(features) = reader.get_features(i) {
                                                 for f in features {
                                                     let mut is_major = false;
-                                                    if let Some(properties) = &f.properties {
-                                                        if let Some(Value::String(val)) = properties.get("class") {
-                                                            if val == "secondary" || val == "unclassified" || val == "primary" || val == "residential" || val == "motorway" {
+                                                    if let Some(properties) = &f.properties
+                                                        && let Some(Value::String(val)) =
+                                                            properties.get("class")
+                                                            && (val == "secondary"
+                                                                || val == "unclassified"
+                                                                || val == "primary"
+                                                                || val == "residential"
+                                                                || val == "motorway")
+                                                            {
                                                                 is_major = true;
                                                             }
-                                                        }
-                                                    }
-                                                    let pb = if is_major { &mut road_major_pb } else { &mut road_minor_pb };
+                                                    let pb = if is_major {
+                                                        &mut road_major_pb
+                                                    } else {
+                                                        &mut road_minor_pb
+                                                    };
                                                     match f.get_geometry() {
-                                                        Geometry::LineString(ls) => add_linestring_to_pb(pb, ls.0.as_slice()),
+                                                        Geometry::LineString(ls) => {
+                                                            add_linestring_to_pb(
+                                                                pb,
+                                                                ls.0.as_slice(),
+                                                            )
+                                                        }
                                                         Geometry::MultiLineString(mls) => {
-                                                            for ls in mls { add_linestring_to_pb(pb, ls.0.as_slice()); }
+                                                            for ls in mls {
+                                                                add_linestring_to_pb(
+                                                                    pb,
+                                                                    ls.0.as_slice(),
+                                                                );
+                                                            }
                                                         }
                                                         _ => {}
                                                     }
                                                 }
                                             }
-                                        } else if layer_name.contains("poi") || layer_name == "place" {
-                                            if let Ok(features) = reader.get_features(i) {
+                                        } else if (layer_name.contains("poi")
+                                            || layer_name == "place")
+                                            && let Ok(features) = reader.get_features(i) {
                                                 for f in features {
                                                     match f.get_geometry() {
                                                         Geometry::Point(pt) => {
-                                                            poi_point_pb.push_circle(pt.x() as f32, pt.y() as f32, 2.5 * (4096.0 / 128.0));
+                                                            poi_point_pb.push_circle(
+                                                                pt.x(),
+                                                                pt.y(),
+                                                                2.5 * (4096.0 / 128.0),
+                                                            );
                                                         }
                                                         Geometry::MultiPoint(mp) => {
-                                                            for pt in mp { poi_point_pb.push_circle(pt.x() as f32, pt.y() as f32, 2.5 * (4096.0 / 128.0)); }
+                                                            for pt in mp {
+                                                                poi_point_pb.push_circle(
+                                                                    pt.x(),
+                                                                    pt.y(),
+                                                                    2.5 * (4096.0 / 128.0),
+                                                                );
+                                                            }
                                                         }
-                                                        Geometry::Polygon(poly) => add_polygon_to_pb(&mut poi_area_pb, poly.exterior().0.as_slice()),
+                                                        Geometry::Polygon(poly) => {
+                                                            add_polygon_to_pb(
+                                                                &mut poi_area_pb,
+                                                                poly.exterior().0.as_slice(),
+                                                            )
+                                                        }
                                                         Geometry::MultiPolygon(mpoly) => {
-                                                            for poly in mpoly { add_polygon_to_pb(&mut poi_area_pb, poly.exterior().0.as_slice()); }
+                                                            for poly in mpoly {
+                                                                add_polygon_to_pb(
+                                                                    &mut poi_area_pb,
+                                                                    poly.exterior().0.as_slice(),
+                                                                );
+                                                            }
                                                         }
                                                         _ => {}
                                                     }
                                                 }
                                             }
-                                        }
                                     }
                                     new_paths.water_fill = water_fill_pb.finish();
                                     new_paths.water_stroke = water_stroke_pb.finish();
@@ -238,28 +311,54 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
                                     new_paths.poi_point = poi_point_pb.finish();
                                     new_paths.poi_area = poi_area_pb.finish();
                                 }
-                            }
                         }
                         let arc_tile = Arc::new(new_paths);
                         TILE_CACHE.with(|cache| {
-                            cache.borrow_mut().put((tile_x, tile_y, zoom), arc_tile.clone());
+                            cache
+                                .borrow_mut()
+                                .put((tile_x, tile_y, zoom), arc_tile.clone());
                         });
                         arc_tile
                     };
 
-                    let final_transform = transform.pre_scale(tile_size / 4096.0, tile_size / 4096.0);
+                    let final_transform =
+                        transform.pre_scale(tile_size / 4096.0, tile_size / 4096.0);
 
                     if let Some(path) = &tile_paths.water_fill {
-                        pixmap.fill_path(path, &paint_water, tiny_skia::FillRule::Winding, final_transform, None);
+                        pixmap.fill_path(
+                            path,
+                            &paint_water,
+                            tiny_skia::FillRule::Winding,
+                            final_transform,
+                            None,
+                        );
                     }
                     if let Some(path) = &tile_paths.water_stroke {
-                        pixmap.stroke_path(path, &paint_water, &stroke_water, final_transform, None);
+                        pixmap.stroke_path(
+                            path,
+                            &paint_water,
+                            &stroke_water,
+                            final_transform,
+                            None,
+                        );
                     }
                     if let Some(path) = &tile_paths.road_minor {
-                        pixmap.stroke_path(path, &paint_road_minor, &stroke_road_minor, final_transform, None);
+                        pixmap.stroke_path(
+                            path,
+                            &paint_road_minor,
+                            &stroke_road_minor,
+                            final_transform,
+                            None,
+                        );
                     }
                     if let Some(path) = &tile_paths.road_major {
-                        pixmap.stroke_path(path, &paint_road_major, &stroke_road_major, final_transform, None);
+                        pixmap.stroke_path(
+                            path,
+                            &paint_road_major,
+                            &stroke_road_major,
+                            final_transform,
+                            None,
+                        );
                     }
                     if let Some(path) = &tile_paths.poi_area {
                         let mut area_paint = paint_poi.clone();
@@ -268,10 +367,22 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
                         } else {
                             area_paint.set_color_rgba8(0x35, 0x35, 0x35, 100);
                         }
-                        pixmap.fill_path(path, &area_paint, tiny_skia::FillRule::Winding, final_transform, None);
+                        pixmap.fill_path(
+                            path,
+                            &area_paint,
+                            tiny_skia::FillRule::Winding,
+                            final_transform,
+                            None,
+                        );
                     }
                     if let Some(path) = &tile_paths.poi_point {
-                        pixmap.fill_path(path, &paint_poi, tiny_skia::FillRule::Winding, final_transform, None);
+                        pixmap.fill_path(
+                            path,
+                            &paint_poi,
+                            tiny_skia::FillRule::Winding,
+                            final_transform,
+                            None,
+                        );
                     }
                 }
             }
@@ -284,7 +395,7 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
     let radius_inner = radius_max * 0.65;
 
     // --- Draw Dashboard Rings (as done in car-app) ---
-    
+
     // 1. Outer Ring (70% - 100% radius) - Lighter dark zone for speedometer
     let mut pb_outer = PathBuilder::new();
     pb_outer.push_circle(center_car_x, center_car_y, radius_max);
@@ -297,7 +408,13 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
             paint.set_color_rgba8(0xFF, 0xFF, 0xFF, 120); // Lighter semi-transparent ring
         }
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::EvenOdd, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            tiny_skia::FillRule::EvenOdd,
+            Transform::identity(),
+            None,
+        );
     }
 
     // 2. Inner Ring (65% - 70% radius) - Vertical depth gradient
@@ -326,7 +443,13 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
             paint.shader = shader;
         }
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::EvenOdd, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            tiny_skia::FillRule::EvenOdd,
+            Transform::identity(),
+            None,
+        );
     }
 
     // 3. Hardware Mask - Solid RED outside the dashboard circle (Dev visibility)
@@ -339,7 +462,13 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
         let mut paint = Paint::default();
         paint.set_color_rgba8(255, 0, 0, 255);
         paint.anti_alias = true;
-        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::EvenOdd, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            tiny_skia::FillRule::EvenOdd,
+            Transform::identity(),
+            None,
+        );
     }
 
     // --- Draw Car Marker (as done in car-app) ---
@@ -347,22 +476,34 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
     let mut paint_glow = Paint::default();
     paint_glow.set_color_rgba8(0xFF, 0x8C, 0x00, 60);
     paint_glow.anti_alias = true;
-    
+
     let mut pb_glow = PathBuilder::new();
     pb_glow.push_circle(center_car_x, center_car_y, 20.0 * scale);
     if let Some(path) = pb_glow.finish() {
-        pixmap.fill_path(&path, &paint_glow, tiny_skia::FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint_glow,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
-    
+
     // NFS_COLOR_CAR_INNER: 0xFFB366, Opa: 255/255
     let mut paint_inner = Paint::default();
     paint_inner.set_color_rgba8(0xFF, 0xB3, 0x66, 255);
     paint_inner.anti_alias = true;
-    
+
     let mut pb_inner = PathBuilder::new();
     pb_inner.push_circle(center_car_x, center_car_y, 10.0 * scale);
     if let Some(path) = pb_inner.finish() {
-        pixmap.fill_path(&path, &paint_inner, tiny_skia::FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint_inner,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 
     // NFS_COLOR_ARROW_FILL: 0x313126 (Tech-Ink)
@@ -373,11 +514,14 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
     let s_arrow = (12.0 / 36.0) * scale;
     let mut pb_arrow = PathBuilder::new();
     let pts = [
-        (4.9f32, 33.0f32), (3.0f32, 31.4f32), 
-        (18.0f32, 3.0f32), (33.0f32, 31.4f32), 
-        (31.1f32, 33.0f32), (18.0f32, 28.3f32)
+        (4.9f32, 33.0f32),
+        (3.0f32, 31.4f32),
+        (18.0f32, 3.0f32),
+        (33.0f32, 31.4f32),
+        (31.1f32, 33.0f32),
+        (18.0f32, 28.3f32),
     ];
-    
+
     pb_arrow.move_to(
         (pts[0].0 - 18.0) * s_arrow + center_car_x,
         (pts[0].1 - 18.0) * s_arrow + center_car_y,
@@ -389,16 +533,24 @@ pub fn render_map(offset_x: f32, offset_y: f32, width: u32, height: u32, view: &
         );
     }
     pb_arrow.close();
-    
+
     if let Some(path) = pb_arrow.finish() {
-        pixmap.fill_path(&path, &paint_arrow, tiny_skia::FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &path,
+            &paint_arrow,
+            tiny_skia::FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 
     buffer
 }
 
 fn add_polygon_to_pb(pb: &mut PathBuilder, coords: &[geo_types::Coord<f32>]) {
-    if coords.is_empty() { return; }
+    if coords.is_empty() {
+        return;
+    }
     pb.move_to(coords[0].x, coords[0].y);
     for point in coords.iter().skip(1) {
         pb.line_to(point.x, point.y);
@@ -407,7 +559,9 @@ fn add_polygon_to_pb(pb: &mut PathBuilder, coords: &[geo_types::Coord<f32>]) {
 }
 
 fn add_linestring_to_pb(pb: &mut PathBuilder, coords: &[geo_types::Coord<f32>]) {
-    if coords.is_empty() { return; }
+    if coords.is_empty() {
+        return;
+    }
     pb.move_to(coords[0].x, coords[0].y);
     for point in coords.iter().skip(1) {
         pb.line_to(point.x, point.y);
@@ -436,10 +590,7 @@ mod tests {
     #[test]
     fn test_add_linestring_to_pb() {
         let mut pb = PathBuilder::new();
-        let coords = vec![
-            Coord { x: 0.0, y: 0.0 },
-            Coord { x: 10.0, y: 10.0 },
-        ];
+        let coords = vec![Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 10.0 }];
         add_linestring_to_pb(&mut pb, &coords);
         let path = pb.finish();
         assert!(path.is_some());
@@ -518,7 +669,7 @@ mod tests {
         };
         let buffer = render_map(0.0, 0.0, 100, 100, &view, false);
         assert_eq!(buffer.width(), 100);
-        
+
         let view_high = MapView {
             center_x: 33756,
             center_y: 21962,
