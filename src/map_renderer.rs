@@ -117,12 +117,16 @@ pub fn render_map(
 
     // POI Primary: Dark: 0xC9C7B8 (Cream), Light: 0x353535 (Tech Grey)
     let mut paint_poi = Paint::default();
+    let mut paint_poi_area = Paint::default();
     if is_dark {
         paint_poi.set_color_rgba8(0xC9, 0xC7, 0xB8, 255);
+        paint_poi_area.set_color_rgba8(0xC9, 0xC7, 0xB8, 100);
     } else {
         paint_poi.set_color_rgba8(0x35, 0x35, 0x35, 255);
+        paint_poi_area.set_color_rgba8(0x35, 0x35, 0x35, 100);
     }
     paint_poi.anti_alias = true;
+    paint_poi_area.anti_alias = true;
 
     let center_car_x = width as f32 / 2.0;
     let center_car_y = height as f32 / 2.0;
@@ -361,15 +365,9 @@ pub fn render_map(
                         );
                     }
                     if let Some(path) = &tile_paths.poi_area {
-                        let mut area_paint = paint_poi.clone();
-                        if is_dark {
-                            area_paint.set_color_rgba8(0xC9, 0xC7, 0xB8, 100);
-                        } else {
-                            area_paint.set_color_rgba8(0x35, 0x35, 0x35, 100);
-                        }
                         pixmap.fill_path(
                             path,
-                            &area_paint,
+                            &paint_poi_area,
                             tiny_skia::FillRule::Winding,
                             final_transform,
                             None,
@@ -388,161 +386,6 @@ pub fn render_map(
             }
         }
     });
-
-    let min_dim = width.min(height) as f32;
-    let radius_max = min_dim / 2.0;
-    let radius_outer = radius_max * 0.70;
-    let radius_inner = radius_max * 0.65;
-
-    // --- Draw Dashboard Rings (as done in car-app) ---
-
-    // 1. Outer Ring (70% - 100% radius) - Lighter dark zone for speedometer
-    let mut pb_outer = PathBuilder::new();
-    pb_outer.push_circle(center_car_x, center_car_y, radius_max);
-    pb_outer.push_circle(center_car_x, center_car_y, radius_outer);
-    if let Some(path) = pb_outer.finish() {
-        let mut paint = Paint::default();
-        if is_dark {
-            paint.set_color_rgba8(0x0A, 0x0A, 0x0A, 180);
-        } else {
-            paint.set_color_rgba8(0xFF, 0xFF, 0xFF, 120); // Lighter semi-transparent ring
-        }
-        paint.anti_alias = true;
-        pixmap.fill_path(
-            &path,
-            &paint,
-            tiny_skia::FillRule::EvenOdd,
-            Transform::identity(),
-            None,
-        );
-    }
-
-    // 2. Inner Ring (65% - 70% radius) - Vertical depth gradient
-    let mut pb_inner = PathBuilder::new();
-    pb_inner.push_circle(center_car_x, center_car_y, radius_outer);
-    pb_inner.push_circle(center_car_x, center_car_y, radius_inner);
-    if let Some(path) = pb_inner.finish() {
-        let mut paint = Paint::default();
-        if let Some(shader) = tiny_skia::LinearGradient::new(
-            tiny_skia::Point::from_xy(0.0, 0.0),
-            tiny_skia::Point::from_xy(0.0, height as f32),
-            if is_dark {
-                vec![
-                    tiny_skia::GradientStop::new(0.0, Color::from_rgba8(0x0A, 0x0A, 0x0A, 160)),
-                    tiny_skia::GradientStop::new(1.0, Color::from_rgba8(0x0A, 0x0A, 0x0A, 40)),
-                ]
-            } else {
-                vec![
-                    tiny_skia::GradientStop::new(0.0, Color::from_rgba8(0xFF, 0xFF, 0xFF, 140)),
-                    tiny_skia::GradientStop::new(1.0, Color::from_rgba8(0xFF, 0xFF, 0xFF, 20)),
-                ]
-            },
-            tiny_skia::SpreadMode::Pad,
-            Transform::identity(),
-        ) {
-            paint.shader = shader;
-        }
-        paint.anti_alias = true;
-        pixmap.fill_path(
-            &path,
-            &paint,
-            tiny_skia::FillRule::EvenOdd,
-            Transform::identity(),
-            None,
-        );
-    }
-
-    // 3. Hardware Mask - Solid RED outside the dashboard circle (Dev visibility)
-    let mut pb_mask = PathBuilder::new();
-    if let Some(rect) = tiny_skia::Rect::from_xywh(0.0, 0.0, width as f32, height as f32) {
-        pb_mask.push_rect(rect);
-    }
-    pb_mask.push_circle(center_car_x, center_car_y, radius_max);
-    if let Some(path) = pb_mask.finish() {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(255, 0, 0, 255);
-        paint.anti_alias = true;
-        pixmap.fill_path(
-            &path,
-            &paint,
-            tiny_skia::FillRule::EvenOdd,
-            Transform::identity(),
-            None,
-        );
-    }
-
-    // --- Draw Car Marker (as done in car-app) ---
-    // NFS_COLOR_CAR_GLOW: 0xFF8C00, Opa: 60/255
-    let mut paint_glow = Paint::default();
-    paint_glow.set_color_rgba8(0xFF, 0x8C, 0x00, 60);
-    paint_glow.anti_alias = true;
-
-    let mut pb_glow = PathBuilder::new();
-    pb_glow.push_circle(center_car_x, center_car_y, 20.0 * scale);
-    if let Some(path) = pb_glow.finish() {
-        pixmap.fill_path(
-            &path,
-            &paint_glow,
-            tiny_skia::FillRule::Winding,
-            Transform::identity(),
-            None,
-        );
-    }
-
-    // NFS_COLOR_CAR_INNER: 0xFFB366, Opa: 255/255
-    let mut paint_inner = Paint::default();
-    paint_inner.set_color_rgba8(0xFF, 0xB3, 0x66, 255);
-    paint_inner.anti_alias = true;
-
-    let mut pb_inner = PathBuilder::new();
-    pb_inner.push_circle(center_car_x, center_car_y, 10.0 * scale);
-    if let Some(path) = pb_inner.finish() {
-        pixmap.fill_path(
-            &path,
-            &paint_inner,
-            tiny_skia::FillRule::Winding,
-            Transform::identity(),
-            None,
-        );
-    }
-
-    // NFS_COLOR_ARROW_FILL: 0x313126 (Tech-Ink)
-    let mut paint_arrow = Paint::default();
-    paint_arrow.set_color_rgba8(0x31, 0x31, 0x26, 255);
-    paint_arrow.anti_alias = true;
-
-    let s_arrow = (12.0 / 36.0) * scale;
-    let mut pb_arrow = PathBuilder::new();
-    let pts = [
-        (4.9f32, 33.0f32),
-        (3.0f32, 31.4f32),
-        (18.0f32, 3.0f32),
-        (33.0f32, 31.4f32),
-        (31.1f32, 33.0f32),
-        (18.0f32, 28.3f32),
-    ];
-
-    pb_arrow.move_to(
-        (pts[0].0 - 18.0) * s_arrow + center_car_x,
-        (pts[0].1 - 18.0) * s_arrow + center_car_y,
-    );
-    for pt in pts.iter().skip(1) {
-        pb_arrow.line_to(
-            (pt.0 - 18.0) * s_arrow + center_car_x,
-            (pt.1 - 18.0) * s_arrow + center_car_y,
-        );
-    }
-    pb_arrow.close();
-
-    if let Some(path) = pb_arrow.finish() {
-        pixmap.fill_path(
-            &path,
-            &paint_arrow,
-            tiny_skia::FillRule::Winding,
-            Transform::identity(),
-            None,
-        );
-    }
 
     buffer
 }

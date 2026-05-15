@@ -5,10 +5,10 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 
-mod map_renderer;
-use map_renderer::{MapView, render_map};
+use car_app::map_renderer::{MapView, render_map};
+use car_app::spotify;
+use car_app::AppWindow;
 
-slint::include_modules!();
 
 struct RenderRequest {
     offset_x: f32,
@@ -32,7 +32,12 @@ fn calculate_simulated_speed(elapsed: f32) -> i32 {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    match dotenvy::dotenv() {
+        Ok(path) => log::info!(".env file loaded from: {:?}", path),
+        Err(e) => log::warn!("Could not load .env file: {}", e),
+    }
     env_logger::init();
+    log::info!("Application starting...");
 
     let ui = AppWindow::new()?;
 
@@ -75,6 +80,74 @@ fn main() -> Result<(), slint::PlatformError> {
             });
         }
     });
+
+    // Spotify setup
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let _guard = rt.enter();
+
+    log::info!("Initializing Spotify client...");
+    let spotify_client = rt.block_on(spotify::SpotifyClient::init());
+    
+    let ui_handle_spotify = ui.as_weak();
+    if let Some(client) = spotify_client {
+        log::info!("Spotify client initialized successfully.");
+        rt.spawn(async move {
+            log::info!("Spotify polling task started.");
+            let mut last_art_url = String::new();
+            loop {
+                log::debug!("Querying Spotify playback...");
+                match client.get_current_playback().await {
+                    Some(mut state) => {
+                        log::debug!("Spotify State: playing={}, track='{}'", state.is_playing, state.track_name);
+                        if let Some(url) = &state.album_art_url {
+                            if url != &last_art_url {
+                                log::debug!("Fetching new album art from: {}", url);
+                                state.album_art_data = client.fetch_album_art(url).await;
+                                last_art_url = url.clone();
+                            }
+                        }
+
+                        let ui_handle = ui_handle_spotify.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_handle.upgrade() {
+                                ui.set_spotify_playing(state.is_playing);
+                                if state.is_playing {
+                                    ui.set_spotify_track(state.track_name.into());
+                                    ui.set_spotify_artist(state.track_artist.into());
+                                    ui.set_spotify_progress(state.progress);
+                                    
+                                    if let Some(data) = state.album_art_data {
+                                        if let Ok(img) = image::load_from_memory(&data) {
+                                            let rgba = img.to_rgba8();
+                                            let slint_img = slint::Image::from_rgba8_premultiplied(
+                                                slint::SharedPixelBuffer::clone_from_slice(
+                                                    rgba.as_raw(),
+                                                    rgba.width(),
+                                                    rgba.height(),
+                                                )
+                                            );
+                                            ui.set_spotify_album_art(slint_img);
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    None => {
+                        let ui_handle = ui_handle_spotify.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_handle.upgrade() {
+                                ui.set_spotify_playing(false);
+                            }
+                        });
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+    } else {
+        log::error!("Failed to initialize Spotify client. Check your credentials and .env file.");
+    }
 
     let initial_size = ui.window().size();
     let display_size = initial_size.width.min(initial_size.height);
