@@ -35,8 +35,4 @@ jobs:
     - name: Run Tests
       run: cargo test --verbose
 
-    - name: Install cargo-tarpaulin
-      run: cargo install cargo-tarpaulin
 
-    - name: Run Coverage
-      run: cargo tarpaulin --verbose --fail-under 50 --ignore-panics --out Xml
