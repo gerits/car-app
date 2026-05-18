@@ -11,6 +11,15 @@ export component AppWindow inherits Window {
     in-out property <bool> is_dark_mode: true;
     in-out property <int> current_speed: 75;
     
+    // Dashboard properties
+    in property <bool> turn_signal_on: false;
+    in property <bool> charge_light_on: false;
+    in property <bool> oil_light_on: false;
+    in property <bool> high_beam_on: false;
+    in property <bool> ignition_light_on: false;
+    in property <float> fuel_level: 0.75;
+    in property <[string]> odometer: ["0", "0", "0", "0", "3", "0"];
+    
     // Spotify properties
     in property <bool> spotify_playing: false;
     in property <string> spotify_track: "";
@@ -286,7 +295,209 @@ export component AppWindow inherits Window {
         transform-rotation: (i == 0 || i == 6) ? angle + 180deg : angle;
     }
 
+    // Odometer
+    Rectangle {
+        property <angle> a: 0deg;
+        property <length> r_dist: root.display_size / 2 * 0.77;
+        width: 130px * root.ui_scale;
+        height: 32px * root.ui_scale;
+        x: root.width / 2 + sin(self.a) * self.r_dist - self.width / 2;
+        y: root.height / 2 - cos(self.a) * self.r_dist - self.height / 2;
+        background: #111;
+        border-color: #333;
+        border-width: 1px * root.ui_scale;
+        
+        HorizontalLayout {
+            spacing: 2px * root.ui_scale;
+            padding: 2px * root.ui_scale;
+            for digit[idx] in root.odometer : Rectangle {
+                background: #000;
+                width: 18px * root.ui_scale;
+                Text {
+                    text: digit;
+                    color: idx == 5 ? #FFB300 : #FFF;
+                    font-family: "Space Grotesk";
+                    font-weight: 500;
+                    font-size: 20px * root.ui_scale;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
 
+    // Center Labels
+    Text {
+        property <angle> a: 180deg;
+        property <length> r_dist: root.display_size / 2 * 0.76;
+        text: "FUEL";
+        font-size: 12px * root.ui_scale;
+        font-family: "Space Grotesk";
+        font-weight: 500;
+        letter-spacing: 2px * root.ui_scale;
+        color: root.theme_foreground;
+        x: root.width / 2 + sin(self.a) * self.r_dist - self.width / 2;
+        y: root.height / 2 - cos(self.a) * self.r_dist - self.height / 2;
+    }
+
+    // Fuel Gauge Texts
+    for t[i] in ["E", "1/2", "F"] : Text {
+        property <angle> a: 180deg + 20deg - i * 20deg;
+        property <length> r_t: root.display_size / 2 * 0.86;
+        
+        text: t;
+        font-size: 16px * root.ui_scale;
+        font-family: "Space Grotesk";
+        font-weight: 500;
+        color: root.theme_foreground;
+        x: root.width / 2 + sin(a) * r_t - self.width / 2;
+        y: root.height / 2 - cos(a) * r_t - self.height / 2;
+    }
+
+    // Fuel Gauge Ticks
+    for i in 5 : Path {
+        property <angle> a: 180deg + 20deg - i * 10deg;
+        property <length> r_in: root.display_size / 2 * 0.94;
+        property <length> r_out: root.display_size / 2 * 0.97;
+        property <length> hw: 1.5px * root.ui_scale;
+        
+        fill: root.theme_foreground;
+        
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        
+        MoveTo { x: (root.width / 2 + sin(a) * r_in - cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_in - sin(a) * hw) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_in + cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_in + sin(a) * hw) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_out + cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_out + sin(a) * hw) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_out - cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_out - sin(a) * hw) / 1px; }
+        Close {}
+    }
+
+    // Fuel Gauge Needle
+    Path {
+        property <angle> a: 180deg + 20deg - root.fuel_level * 40deg;
+        property <length> r_in: root.display_size / 2 * 0.89;
+        property <length> r_out: root.display_size / 2 * 0.98;
+        property <length> hw: 3.5px * root.ui_scale;
+        
+        fill: #FF8C00;
+        
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        
+        MoveTo { x: (root.width / 2 + sin(a) * r_in - cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_in - sin(a) * hw) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_in + cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_in + sin(a) * hw) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_out + cos(a) * hw * 0.4) / 1px; y: (root.height / 2 - cos(a) * r_out + sin(a) * hw * 0.4) / 1px; }
+        LineTo { x: (root.width / 2 + sin(a) * r_out - cos(a) * hw * 0.4) / 1px; y: (root.height / 2 - cos(a) * r_out - sin(a) * hw * 0.4) / 1px; }
+        Close {}
+    }
+
+    // Indicator Lights
+    // Top Green (Turn Signal)
+    Rectangle {
+        property <angle> a: -20deg;
+        property <length> r_dist: root.display_size / 2 * 0.77;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        width: 14px * root.ui_scale;
+        height: 14px * root.ui_scale;
+        border-radius: self.width / 2;
+        background: root.turn_signal_on ? #00FF00 : #004400;
+        border-width: 1.5px * root.ui_scale;
+        border-color: rgba(0, 0, 0, 0.6);
+        
+        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+    }
+
+    // Left Red (Charge/Ignition)
+    Rectangle {
+        property <angle> a: -102.85deg;
+        property <length> r_dist: root.display_size / 2 * 0.77;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        width: 14px * root.ui_scale;
+        height: 14px * root.ui_scale;
+        border-radius: self.width / 2;
+        background: root.charge_light_on ? #FF0000 : #440000;
+        border-width: 1.5px * root.ui_scale;
+        border-color: rgba(0, 0, 0, 0.6);
+        
+        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+    }
+
+    // Right Red (Oil/Warning)
+    Rectangle {
+        property <angle> a: 102.85deg;
+        property <length> r_dist: root.display_size / 2 * 0.77;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        width: 14px * root.ui_scale;
+        height: 14px * root.ui_scale;
+        border-radius: self.width / 2;
+        background: root.oil_light_on ? #FF0000 : #440000;
+        border-width: 1.5px * root.ui_scale;
+        border-color: rgba(0, 0, 0, 0.6);
+        
+        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+    }
+
+    // Bottom Left (H/B)
+    Rectangle {
+        property <angle> a: -140deg;
+        property <length> r_dist: root.display_size / 2 * 0.82;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        width: 12px * root.ui_scale;
+        height: 12px * root.ui_scale;
+        border-radius: self.width / 2;
+        background: root.high_beam_on ? #0088FF : #001133;
+        border-width: 1.5px * root.ui_scale;
+        border-color: rgba(0, 0, 0, 0.6);
+        
+        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+    }
+    Text {
+        property <angle> a: -140deg;
+        property <length> r_dist: root.display_size / 2 * 0.88;
+        text: "H/B";
+        font-size: 10px * root.ui_scale;
+        font-family: "Space Grotesk";
+        font-weight: 500;
+        color: root.theme_foreground;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+    }
+
+    // Bottom Right (IGN)
+    Rectangle {
+        property <angle> a: 140deg;
+        property <length> r_dist: root.display_size / 2 * 0.82;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        width: 12px * root.ui_scale;
+        height: 12px * root.ui_scale;
+        border-radius: self.width / 2;
+        background: root.ignition_light_on ? #FF4400 : #331100;
+        border-width: 1.5px * root.ui_scale;
+        border-color: rgba(0, 0, 0, 0.6);
+        
+        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+    }
+    Text {
+        property <angle> a: 140deg;
+        property <length> r_dist: root.display_size / 2 * 0.88;
+        text: "IGN";
+        font-size: 10px * root.ui_scale;
+        font-family: "Space Grotesk";
+        font-weight: 500;
+        color: root.theme_foreground;
+        x: root.width / 2 + sin(a) * r_dist - self.width / 2;
+        y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+    }
 
     TouchArea {
         property <length> start_x;
