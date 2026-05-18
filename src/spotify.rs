@@ -160,3 +160,37 @@ impl SpotifyClient {
         Some(bytes.to_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_init_missing_env_vars() {
+        // Remove env vars to ensure we hit the early return path
+        unsafe {
+            std::env::remove_var("SPOTIFY_CLIENT_ID");
+            std::env::remove_var("SPOTIFY_CLIENT_SECRET");
+        }
+        
+        let client = SpotifyClient::init().await;
+        assert!(client.is_none());
+    }
+    
+    #[test]
+    fn test_spotify_state_struct() {
+        let state = SpotifyState {
+            is_playing: true,
+            track_name: "Test Track".to_string(),
+            track_artist: "Test Artist".to_string(),
+            progress: 0.5,
+            album_art_url: Some("http://example.com/art.png".to_string()),
+            album_art_data: None,
+        };
+        assert_eq!(state.is_playing, true);
+        assert_eq!(state.track_name, "Test Track");
+        assert_eq!(state.track_artist, "Test Artist");
+        assert_eq!(state.progress, 0.5);
+        assert_eq!(state.album_art_url, Some("http://example.com/art.png".to_string()));
+    }
+}

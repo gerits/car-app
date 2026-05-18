@@ -273,4 +273,9 @@ mod tests {
         let s_pi = calculate_simulated_speed(std::f32::consts::PI);
         assert!(s_pi >= 10 && s_pi <= 130);
     }
+    #[test]
+    fn test_is_night_time() {
+        // Just execute it to ensure it doesn't panic and we get coverage.
+        let _ = is_night_time();
+    }
 }
