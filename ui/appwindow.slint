@@ -1,6 +1,33 @@
 import "../assets/SpaceGrotesk-VariableFont_wght.ttf";
 import "../assets/SpaceGrotesk-Bold.ttf";
 
+component ModernCircularIndicator inherits Rectangle {
+    in property <bool> active;
+    in property <color> active_color;
+    in property <color> glow_color;
+    
+    width: 15px;
+    height: 15px;
+    border-radius: self.width / 2;
+    background: root.active ? root.active_color : rgba(120, 120, 120, 0.15);
+    
+    animate background { duration: 150ms; easing: ease-in-out; }
+
+    // Outer aura glow
+    Rectangle {
+        width: 250%;
+        height: 250%;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: self.width / 2;
+        background: root.active ? root.glow_color : transparent;
+        opacity: root.active ? 0.22 : 0.0;
+        
+        animate background { duration: 150ms; }
+        animate opacity { duration: 150ms; }
+    }
+}
+
 export component AppWindow inherits Window {
     title: "Car App";
     preferred-width: 800px;
@@ -259,10 +286,10 @@ export component AppWindow inherits Window {
         transform-rotation: (i == 0 || i == 6) ? angle + 180deg : angle;
     }
 
-    // Odometer
+    // Odometer (Kilometer Counter) positioned just above the fuel gauge in the outer ring
     Rectangle {
-        property <angle> a: 0deg;
-        property <length> r_dist: root.display_size / 2 * 0.77;
+        property <angle> a: 180deg;
+        property <length> r_dist: root.display_size / 2 * 0.67;
         width: 130px * root.ui_scale;
         height: 32px * root.ui_scale;
         x: root.width / 2 + sin(self.a) * self.r_dist - self.width / 2;
@@ -290,21 +317,21 @@ export component AppWindow inherits Window {
         }
     }
 
-    // Center Labels
+    // Center Fuel Label (Slightly smaller, positioned above the fuel ticks)
     Text {
         property <angle> a: 180deg;
-        property <length> r_dist: root.display_size / 2 * 0.76;
+        property <length> r_dist: root.display_size / 2 * 0.77;
         text: "FUEL";
-        font-size: 12px * root.ui_scale;
+        font-size: 11px * root.ui_scale;
         font-family: "Space Grotesk";
         font-weight: 500;
-        letter-spacing: 2px * root.ui_scale;
+        letter-spacing: 1.5px * root.ui_scale;
         color: root.theme_foreground;
         x: root.width / 2 + sin(self.a) * self.r_dist - self.width / 2;
         y: root.height / 2 - cos(self.a) * self.r_dist - self.height / 2;
     }
 
-    // Fuel Gauge Texts
+    // Fuel Gauge Texts (Original layout, fully at the bottom)
     for t[i] in ["E", "1/2", "F"] : Text {
         property <angle> a: 180deg + 20deg - i * 20deg;
         property <length> r_t: root.display_size / 2 * 0.86;
@@ -318,7 +345,7 @@ export component AppWindow inherits Window {
         y: root.height / 2 - cos(a) * r_t - self.height / 2;
     }
 
-    // Fuel Gauge Ticks
+    // Fuel Gauge Ticks (Original layout, fully at the bottom)
     for i in 5 : Path {
         property <angle> a: 180deg + 20deg - i * 10deg;
         property <length> r_in: root.display_size / 2 * 0.94;
@@ -339,7 +366,7 @@ export component AppWindow inherits Window {
         Close {}
     }
 
-    // Fuel Gauge Needle
+    // Fuel Gauge Needle (Original layout, fully at the bottom)
     Path {
         property <angle> a: 180deg + 20deg - root.fuel_level * 40deg;
         property <length> r_in: root.display_size / 2 * 0.89;
@@ -360,69 +387,62 @@ export component AppWindow inherits Window {
         Close {}
     }
 
-    // Indicator Lights
+    // Modern Radial Dashboard Indicator Lights (Smiths Dial Positions)
+    
     // Top Green (Turn Signal)
-    Rectangle {
-        property <angle> a: -20deg;
+    ModernCircularIndicator {
+        property <angle> a: 0deg;
         property <length> r_dist: root.display_size / 2 * 0.77;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
-        width: 14px * root.ui_scale;
-        height: 14px * root.ui_scale;
-        border-radius: self.width / 2;
-        background: root.turn_signal_on ? #00FF00 : #004400;
-        border-width: 1.5px * root.ui_scale;
-        border-color: rgba(0, 0, 0, 0.6);
+        width: 16px * root.ui_scale;
+        height: 16px * root.ui_scale;
         
-        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+        active: root.turn_signal_on;
+        active_color: #00FF66; // Vibrant neon green
+        glow_color: rgba(0, 255, 102, 0.22);
     }
 
     // Left Red (Charge/Ignition)
-    Rectangle {
+    ModernCircularIndicator {
         property <angle> a: -102.85deg;
         property <length> r_dist: root.display_size / 2 * 0.77;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
-        width: 14px * root.ui_scale;
-        height: 14px * root.ui_scale;
-        border-radius: self.width / 2;
-        background: root.charge_light_on ? #FF0000 : #440000;
-        border-width: 1.5px * root.ui_scale;
-        border-color: rgba(0, 0, 0, 0.6);
+        width: 15px * root.ui_scale;
+        height: 15px * root.ui_scale;
         
-        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+        active: root.charge_light_on;
+        active_color: #FF2A2A; // Vibrant neon red
+        glow_color: rgba(255, 42, 42, 0.22);
     }
 
     // Right Red (Oil/Warning)
-    Rectangle {
+    ModernCircularIndicator {
         property <angle> a: 102.85deg;
         property <length> r_dist: root.display_size / 2 * 0.77;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
-        width: 14px * root.ui_scale;
-        height: 14px * root.ui_scale;
-        border-radius: self.width / 2;
-        background: root.oil_light_on ? #FF0000 : #440000;
-        border-width: 1.5px * root.ui_scale;
-        border-color: rgba(0, 0, 0, 0.6);
+        width: 15px * root.ui_scale;
+        height: 15px * root.ui_scale;
         
-        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+        active: root.oil_light_on;
+        active_color: #FF2A2A; // Vibrant neon red
+        glow_color: rgba(255, 42, 42, 0.22);
     }
 
     // Bottom Left (H/B)
-    Rectangle {
+    ModernCircularIndicator {
         property <angle> a: -140deg;
         property <length> r_dist: root.display_size / 2 * 0.82;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
-        width: 12px * root.ui_scale;
-        height: 12px * root.ui_scale;
-        border-radius: self.width / 2;
-        background: root.high_beam_on ? #0088FF : #001133;
-        border-width: 1.5px * root.ui_scale;
-        border-color: rgba(0, 0, 0, 0.6);
+        width: 14px * root.ui_scale;
+        height: 14px * root.ui_scale;
         
-        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+        active: root.high_beam_on;
+        active_color: #0088FF; // Vibrant neon blue
+        glow_color: rgba(0, 136, 255, 0.22);
     }
     Text {
         property <angle> a: -140deg;
@@ -430,26 +450,27 @@ export component AppWindow inherits Window {
         text: "H/B";
         font-size: 10px * root.ui_scale;
         font-family: "Space Grotesk";
-        font-weight: 500;
+        font-weight: 700;
         color: root.theme_foreground;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        opacity: root.high_beam_on ? 1.0 : 0.45;
+        
+        animate opacity { duration: 150ms; }
     }
 
     // Bottom Right (IGN)
-    Rectangle {
+    ModernCircularIndicator {
         property <angle> a: 140deg;
         property <length> r_dist: root.display_size / 2 * 0.82;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
-        width: 12px * root.ui_scale;
-        height: 12px * root.ui_scale;
-        border-radius: self.width / 2;
-        background: root.ignition_light_on ? #FF4400 : #331100;
-        border-width: 1.5px * root.ui_scale;
-        border-color: rgba(0, 0, 0, 0.6);
+        width: 14px * root.ui_scale;
+        height: 14px * root.ui_scale;
         
-        Rectangle { width: 50%; height: 50%; x: parent.width * 0.2; y: parent.height * 0.15; border-radius: self.width / 2; background: rgba(255, 255, 255, 0.3); }
+        active: root.ignition_light_on;
+        active_color: #FF9900; // Vibrant neon amber/orange
+        glow_color: rgba(255, 153, 0, 0.22);
     }
     Text {
         property <angle> a: 140deg;
@@ -457,10 +478,13 @@ export component AppWindow inherits Window {
         text: "IGN";
         font-size: 10px * root.ui_scale;
         font-family: "Space Grotesk";
-        font-weight: 500;
+        font-weight: 700;
         color: root.theme_foreground;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+        opacity: root.ignition_light_on ? 1.0 : 0.45;
+        
+        animate opacity { duration: 150ms; }
     }
 
     // Needle

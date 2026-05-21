@@ -247,6 +247,43 @@ fn main() -> Result<(), slint::PlatformError> {
         },
     );
 
+    // Dashboard indicators simulation timer for demo purpose
+    let ui_handle_indicators = ui.as_weak();
+    let indicators_timer = slint::Timer::default();
+    let mut indicator_seed: u32 = 123456789;
+    
+    indicators_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(600),
+        move || {
+            if let Some(ui) = ui_handle_indicators.upgrade() {
+                // Linear Congruential Generator step to generate pseudo-random numbers
+                indicator_seed = indicator_seed.wrapping_mul(1103515245).wrapping_add(12345);
+                let rand_val = indicator_seed;
+
+                // Turn signal: regular blinking (active on even LCG ticks)
+                let turn_active = (rand_val & 0x01) == 0;
+                ui.set_turn_signal_on(turn_active);
+
+                // High beam: active ~30% of the time
+                let hb_active = (rand_val % 10) < 3;
+                ui.set_high_beam_on(hb_active);
+
+                // Charge/battery light: active ~30% of the time
+                let charge_active = ((rand_val >> 2) % 10) < 3;
+                ui.set_charge_light_on(charge_active);
+
+                // Oil light: active ~20% of the time
+                let oil_active = ((rand_val >> 4) % 10) < 2;
+                ui.set_oil_light_on(oil_active);
+
+                // Ignition light: active ~40% of the time
+                let ign_active = ((rand_val >> 6) % 10) < 4;
+                ui.set_ignition_light_on(ign_active);
+            }
+        },
+    );
+
     ui.run()
 }
 
