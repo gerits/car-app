@@ -237,43 +237,7 @@ export component AppWindow inherits Window {
     }
     
 
-    // Needle
-    Path {
-        property <angle> needle_angle: -120deg + (Math.max(10, Math.min(150, root.current_speed)) - 10) / 140.0 * 240deg;
-        property <length> r_in: root.display_size / 2 * 0.70;
-        property <length> r_out: root.display_size / 2 * 0.96 - 14px * root.ui_scale; 
-        
-        fill: #FF8C00; // NFS Glow Orange
-        
-        width: root.width;
-        height: root.height;
-        viewbox-width: root.width / 1px;
-        viewbox-height: root.height / 1px;
-        
-        transform-rotation: self.needle_angle;
-        
-        MoveTo {
-            x: (root.width / 2 - 6px * root.ui_scale) / 1px;
-            y: (root.height / 2 - r_in) / 1px;
-        }
-        LineTo {
-            x: (root.width / 2 - 2px * root.ui_scale) / 1px;
-            y: (root.height / 2 - r_out) / 1px;
-        }
-        LineTo {
-            x: (root.width / 2) / 1px;
-            y: (root.height / 2 - r_out - 8px * root.ui_scale) / 1px;
-        }
-        LineTo {
-            x: (root.width / 2 + 2px * root.ui_scale) / 1px;
-            y: (root.height / 2 - r_out) / 1px;
-        }
-        LineTo {
-            x: (root.width / 2 + 6px * root.ui_scale) / 1px;
-            y: (root.height / 2 - r_in) / 1px;
-        }
-        Close {}
-    }
+
 
     // Speed Numbers
     for i in 7 : Text {
@@ -497,6 +461,44 @@ export component AppWindow inherits Window {
         color: root.theme_foreground;
         x: root.width / 2 + sin(a) * r_dist - self.width / 2;
         y: root.height / 2 - cos(a) * r_dist - self.height / 2;
+    }
+
+    // Needle
+    Path {
+        property <angle> needle_angle: -120deg + (Math.max(10, Math.min(150, root.current_speed)) - 10) / 140.0 * 240deg;
+        property <length> r_in: root.display_size / 2 * 0.70;
+        property <length> r_out: root.display_size / 2 * 0.96 - 14px * root.ui_scale; 
+        
+        fill: #FF8C00; // NFS Glow Orange
+        
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        
+        transform-rotation: self.needle_angle;
+        
+        MoveTo {
+            x: (root.width / 2 - 6px * root.ui_scale) / 1px;
+            y: (root.height / 2 - r_in) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 - 2px * root.ui_scale) / 1px;
+            y: (root.height / 2 - r_out) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2) / 1px;
+            y: (root.height / 2 - r_out - 8px * root.ui_scale) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + 2px * root.ui_scale) / 1px;
+            y: (root.height / 2 - r_out) / 1px;
+        }
+        LineTo {
+            x: (root.width / 2 + 6px * root.ui_scale) / 1px;
+            y: (root.height / 2 - r_in) / 1px;
+        }
+        Close {}
     }
 
     TouchArea {
