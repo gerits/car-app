@@ -40,6 +40,7 @@ pub struct MapView {
     pub center_x: u64,
     pub center_y: u64,
     pub zoom: u8,
+    pub camera_zoom: f32,
 }
 
 pub fn render_map(
@@ -47,8 +48,10 @@ pub fn render_map(
     offset_y: f32,
     width: u32,
     height: u32,
+    scale: f32,
     view: &MapView,
     is_dark: bool,
+    rotation_degrees: f32,
 ) -> SharedPixelBuffer<Rgba8Pixel> {
     if width == 0 || height == 0 {
         return SharedPixelBuffer::<Rgba8Pixel>::new(1, 1);
@@ -69,8 +72,6 @@ pub fn render_map(
     } else {
         pixmap.fill(Color::from_rgba8(0xE8, 0xE8, 0xE8, 255));
     }
-
-    let scale = (width as f32 / 800.0).max(height as f32 / 480.0);
 
     // NFS_COLOR_MAP_WATER: Dark: 0x050505, Light: 0xC4D3DF
     let mut paint_water = Paint::default();
@@ -133,22 +134,26 @@ pub fn render_map(
 
     PM.with(|pm_ref| {
         if let Some(pm) = pm_ref.borrow_mut().as_mut() {
-            let tile_size = (512.0 / 4.0) * scale; // 128px tiles at simulated Z=14
+            let tile_size = 512.0 * scale * view.camera_zoom; // Standard 512px vector tiles at Z=16
 
             // Center relative to focal point fractional offsets at Z=16
             let start_x = center_car_x - (0.0061724 * tile_size);
             let start_y = center_car_y - (0.5817041 * tile_size);
 
-            let scaled_offset_x = offset_x * scale;
-            let scaled_offset_y = offset_y * scale;
+            let scaled_offset_x = offset_x * scale * view.camera_zoom;
+            let scaled_offset_y = offset_y * scale * view.camera_zoom;
 
-            let min_dx = ((-scaled_offset_x - tile_size - start_x) / tile_size).floor() as i32 - 1;
-            let max_dx =
-                ((width as f32 - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
+            let radius = ((width as f32 / 2.0).powi(2) + (height as f32 / 2.0).powi(2)).sqrt();
+            let min_visible_x = center_car_x - radius;
+            let max_visible_x = center_car_x + radius;
+            let min_visible_y = center_car_y - radius;
+            let max_visible_y = center_car_y + radius;
 
-            let min_dy = ((-scaled_offset_y - tile_size - start_y) / tile_size).floor() as i32 - 1;
-            let max_dy =
-                ((height as f32 - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
+            let min_dx = ((min_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 - 1;
+            let max_dx = ((max_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
+
+            let min_dy = ((min_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 - 1;
+            let max_dy = ((max_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
 
             for dx in min_dx..=max_dx {
                 for dy in min_dy..=max_dy {
@@ -237,6 +242,7 @@ pub fn render_map(
                                                         && let Some(Value::String(val)) =
                                                             properties.get("class")
                                                             && (val == "secondary"
+                                                                || val == "tertiary"
                                                                 || val == "unclassified"
                                                                 || val == "primary"
                                                                 || val == "residential"
@@ -325,8 +331,9 @@ pub fn render_map(
                         arc_tile
                     };
 
-                    let final_transform =
-                        transform.pre_scale(tile_size / 4096.0, tile_size / 4096.0);
+                    let final_transform = transform
+                        .pre_scale(tile_size / 4096.0, tile_size / 4096.0)
+                        .post_rotate_at(-rotation_degrees, center_car_x, center_car_y);
 
                     if let Some(path) = &tile_paths.water_fill {
                         pixmap.fill_path(
@@ -445,8 +452,9 @@ mod tests {
             center_x: 0,
             center_y: 0,
             zoom: 14,
+            camera_zoom: 1.0,
         };
-        let buffer = render_map(0.0, 0.0, 0, 0, &view, true);
+        let buffer = render_map(0.0, 0.0, 0, 0, 1.0, &view, true, 0.0);
         assert_eq!(buffer.width(), 1);
         assert_eq!(buffer.height(), 1);
     }
@@ -457,8 +465,9 @@ mod tests {
             center_x: 33756,
             center_y: 21962,
             zoom: 16,
+            camera_zoom: 0.25,
         };
-        let buffer = render_map(0.0, 0.0, 100, 100, &view, true);
+        let buffer = render_map(0.0, 0.0, 100, 100, 1.0, &view, true, 0.0);
         assert_eq!(buffer.width(), 100);
     }
 
@@ -468,9 +477,10 @@ mod tests {
             center_x: 33756,
             center_y: 21962,
             zoom: 16,
+            camera_zoom: 0.25,
         };
-        let mut buffer_dark = render_map(0.0, 0.0, 10, 10, &view, true);
-        let mut buffer_light = render_map(0.0, 0.0, 10, 10, &view, false);
+        let mut buffer_dark = render_map(0.0, 0.0, 10, 10, 1.0, &view, true, 0.0);
+        let mut buffer_light = render_map(0.0, 0.0, 10, 10, 1.0, &view, false, 0.0);
         // Buffers should be different (at least the background color)
         assert_ne!(buffer_dark.make_mut_slice(), buffer_light.make_mut_slice());
     }
@@ -481,9 +491,10 @@ mod tests {
             center_x: 33756,
             center_y: 21962,
             zoom: 16,
+            camera_zoom: 0.25,
         };
-        let mut buffer1 = render_map(0.0, 0.0, 50, 50, &view, true);
-        let mut buffer2 = render_map(10.0, 10.0, 50, 50, &view, true);
+        let mut buffer1 = render_map(0.0, 0.0, 50, 50, 1.0, &view, true, 0.0);
+        let mut buffer2 = render_map(10.0, 10.0, 50, 50, 1.0, &view, true, 0.0);
         assert_ne!(buffer1.make_mut_slice(), buffer2.make_mut_slice());
     }
 
@@ -509,16 +520,18 @@ mod tests {
             center_x: 33756,
             center_y: 21962,
             zoom: 10,
+            camera_zoom: 0.25,
         };
-        let buffer = render_map(0.0, 0.0, 100, 100, &view, false);
+        let buffer = render_map(0.0, 0.0, 100, 100, 1.0, &view, false, 0.0);
         assert_eq!(buffer.width(), 100);
 
         let view_high = MapView {
             center_x: 33756,
             center_y: 21962,
             zoom: 18,
+            camera_zoom: 0.25,
         };
-        let buffer_high = render_map(0.0, 0.0, 100, 100, &view_high, false);
+        let buffer_high = render_map(0.0, 0.0, 100, 100, 1.0, &view_high, false, 0.0);
         assert_eq!(buffer_high.width(), 100);
     }
 }

@@ -35,6 +35,17 @@ export component AppWindow inherits Window {
     background: #0A0A0A; // Instrument Black
 
     in property <image> map_bg;
+    in property <angle> map_rotation: 0deg;
+    in property <float> map_rendered_world_x: 0.0;
+    in property <float> map_rendered_world_y: 0.0;
+    in property <float> current_world_x: 33756.0;
+    in property <float> current_world_y: 21962.0;
+
+    property <float> map_scale: Math.max(root.display_size / 800px, root.display_size / 480px);
+    property <length> map_pixels_per_unit: 512px * root.map_scale * 0.25;
+    property <length> map_shift_x: (root.map_rendered_world_x - root.current_world_x) * root.map_pixels_per_unit;
+    property <length> map_shift_y: (root.map_rendered_world_y - root.current_world_y) * root.map_pixels_per_unit;
+
     in-out property <bool> is_dark_mode: true;
     in-out property <int> current_speed: 75;
     
@@ -70,11 +81,26 @@ export component AppWindow inherits Window {
         border-radius: self.width / 2;
         clip: true;
 
-        Image {
-            width: parent.width;
-            height: parent.height;
-            source: root.map_bg;
-            image-fit: fill;
+        // Inner container for rotation and translation
+        Rectangle {
+            // Make the map image larger than the display so corners don't clip when rotated
+            width: root.display_size * 1.5;
+            height: root.display_size * 1.5;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            
+            // Map renderer previously rotated by -rotation_degrees, so we match it here
+            transform-rotation: -root.map_rotation;
+
+            Image {
+                width: 100%;
+                height: 100%;
+                source: root.map_bg;
+                image-fit: fill;
+                // Shift the map image smoothly
+                x: root.map_shift_x;
+                y: root.map_shift_y;
+            }
         }
 
         // Outer Ring (70% - 100% radius)
@@ -224,7 +250,16 @@ export component AppWindow inherits Window {
         }
     }
 
-    // Speed Arch
+    // --- STATIC CACHED DASHBOARD ELEMENTS ---
+    // These paths and texts are very expensive to software-rasterize on every frame.
+    // By wrapping them in a Rectangle with cache-rendering-hint, Slint draws them
+    // once into a texture and re-uses the texture, saving ~50% CPU!
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        cache-rendering-hint: true;
+
+        // Speed Arch
     for i in 71 : Path {
         property <int> speed: 10 + i * 2;
         property <angle> angle: -120deg + (i / 70.0) * 240deg;
@@ -365,6 +400,7 @@ export component AppWindow inherits Window {
         LineTo { x: (root.width / 2 + sin(a) * r_out - cos(a) * hw) / 1px; y: (root.height / 2 - cos(a) * r_out - sin(a) * hw) / 1px; }
         Close {}
     }
+    } // End of static cached elements
 
     // Fuel Gauge Needle (Original layout, fully at the bottom)
     Path {

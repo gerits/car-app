@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         center_x: 33756,
         center_y: 21962,
         zoom: 16,
+        camera_zoom: 0.25,
     };
     
     let buffer = render_map(
@@ -27,8 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0.0,
         800, 
         800,
+        1.0,
         &view,
         true,
+        0.0,
     );
     ui.set_map_bg(slint::Image::from_rgba8_premultiplied(buffer));
 
