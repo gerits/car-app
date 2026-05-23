@@ -243,6 +243,11 @@ export component AppWindow inherits Window {
                             width: parent.width * root.spotify_progress;
                             background: #1DB954;
                             border-radius: parent.border-radius;
+
+                            animate width {
+                                duration: 1000ms;
+                                easing: linear;
+                            }
                         }
                     }
                 }
@@ -406,6 +411,11 @@ export component AppWindow inherits Window {
     Path {
         property <angle> a: 180deg + 20deg - root.fuel_level * 40deg;
         property <length> r_in: root.display_size / 2 * 0.89;
+
+        animate a {
+            duration: 250ms;
+            easing: ease-in-out;
+        }
         property <length> r_out: root.display_size / 2 * 0.98;
         property <length> hw: 3.5px * root.ui_scale;
         
@@ -527,6 +537,11 @@ export component AppWindow inherits Window {
     Path {
         property <angle> needle_angle: -120deg + (Math.max(10, Math.min(150, root.current_speed)) - 10) / 140.0 * 240deg;
         property <length> r_in: root.display_size / 2 * 0.70;
+
+        animate needle_angle {
+            duration: 100ms;
+            easing: ease-in-out;
+        }
         property <length> r_out: root.display_size / 2 * 0.96 - 14px * root.ui_scale; 
         
         fill: #FF8C00; // NFS Glow Orange

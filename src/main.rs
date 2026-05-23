@@ -185,14 +185,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let _guard = rt.enter();
 
-    log::info!("Initializing Spotify client...");
-    let spotify_client = rt.block_on(spotify::SpotifyClient::init());
-    
     let ui_handle_spotify = ui.as_weak();
-    if let Some(client) = spotify_client {
-        log::info!("Spotify client initialized successfully.");
-        rt.spawn(async move {
-            log::info!("Spotify polling task started.");
+    rt.spawn(async move {
+        log::info!("Initializing Spotify client in the background...");
+        if let Some(client) = spotify::SpotifyClient::init().await {
+            log::info!("Spotify client initialized successfully. Starting polling task...");
             let mut last_art_url = String::new();
             loop {
                 log::debug!("Querying Spotify playback...");
@@ -244,10 +241,10 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
-        });
-    } else {
-        log::error!("Failed to initialize Spotify client. Check your credentials and .env file.");
-    }
+        } else {
+            log::error!("Failed to initialize Spotify client. Check your credentials and .env file.");
+        }
+    });
 
     let initial_size = ui.window().size();
     let display_size = initial_size.width.min(initial_size.height);

@@ -180,11 +180,19 @@ pub fn render_map(
                             poi_area: None,
                         };
 
-                        if let Ok(Some(tile_data)) = pm.get_tile(tile_x, tile_y, zoom) {
-                            let mut d = flate2::read::GzDecoder::new(tile_data.as_slice());
-                            let mut decompressed = Vec::new();
-                            if d.read_to_end(&mut decompressed).is_ok()
-                                && let Ok(reader) = mvt_reader::Reader::new(decompressed) {
+                        let mut cache_tile = false;
+
+                        match pm.get_tile(tile_x, tile_y, zoom) {
+                            Ok(Some(tile_data)) => {
+                                let mut d = flate2::read::GzDecoder::new(tile_data.as_slice());
+                                let mut decompressed = Vec::new();
+                                let decode_bytes = if d.read_to_end(&mut decompressed).is_ok() {
+                                    decompressed
+                                } else {
+                                    tile_data.as_slice().to_vec()
+                                };
+
+                                if let Ok(reader) = mvt_reader::Reader::new(decode_bytes) {
                                     let mut water_fill_pb = PathBuilder::new();
                                     let mut water_stroke_pb = PathBuilder::new();
                                     let mut road_major_pb = PathBuilder::new();
@@ -241,15 +249,14 @@ pub fn render_map(
                                                     if let Some(properties) = &f.properties
                                                         && let Some(Value::String(val)) =
                                                             properties.get("class")
-                                                            && (val == "secondary"
-                                                                || val == "tertiary"
-                                                                || val == "unclassified"
-                                                                || val == "primary"
-                                                                || val == "residential"
-                                                                || val == "motorway")
-                                                            {
+                                                    {
+                                                        match val.as_str() {
+                                                            "secondary" | "tertiary" | "unclassified" | "primary" | "residential" | "motorway" => {
                                                                 is_major = true;
                                                             }
+                                                            _ => {}
+                                                        }
+                                                    }
                                                     let pb = if is_major {
                                                         &mut road_major_pb
                                                     } else {
@@ -320,14 +327,27 @@ pub fn render_map(
                                     new_paths.road_minor = road_minor_pb.finish();
                                     new_paths.poi_point = poi_point_pb.finish();
                                     new_paths.poi_area = poi_area_pb.finish();
+                                    cache_tile = true;
                                 }
+                            }
+                            Ok(None) => {
+                                // Tile definitely does not exist
+                                cache_tile = true;
+                            }
+                            Err(e) => {
+                                error!("Failed to get tile from PMTiles: {}", e);
+                            }
                         }
+
                         let arc_tile = Arc::new(new_paths);
-                        TILE_CACHE.with(|cache| {
-                            cache
-                                .borrow_mut()
-                                .put((tile_x, tile_y, zoom), arc_tile.clone());
-                        });
+                        // Only cache if there was no reading error (i.e. successfully decoded or definitely does not exist)
+                        if cache_tile {
+                            TILE_CACHE.with(|cache| {
+                                cache
+                                    .borrow_mut()
+                                    .put((tile_x, tile_y, zoom), arc_tile.clone());
+                            });
+                        }
                         arc_tile
                     };
 

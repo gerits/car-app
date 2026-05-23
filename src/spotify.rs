@@ -15,6 +15,7 @@ pub struct SpotifyState {
 
 pub struct SpotifyClient {
     client: AuthCodeSpotify,
+    http_client: reqwest::Client,
 }
 
 impl SpotifyClient {
@@ -86,7 +87,10 @@ impl SpotifyClient {
             }
         }
 
-        Some(Self { client: spotify })
+        Some(Self {
+            client: spotify,
+            http_client: reqwest::Client::new(),
+        })
     }
 
     pub async fn get_current_playback(&self) -> Option<SpotifyState> {
@@ -100,7 +104,7 @@ impl SpotifyClient {
         drop(token);
 
         let url = "https://api.spotify.com/v1/me/player/currently-playing";
-        let response = reqwest::Client::new()
+        let response = self.http_client
             .get(url)
             .bearer_auth(access_token)
             .send()
@@ -155,7 +159,7 @@ impl SpotifyClient {
     }
 
     pub async fn fetch_album_art(&self, url: &str) -> Option<Vec<u8>> {
-        let response = reqwest::get(url).await.ok()?;
+        let response = self.http_client.get(url).send().await.ok()?;
         let bytes = response.bytes().await.ok()?;
         Some(bytes.to_vec())
     }
