@@ -8,6 +8,11 @@ use std::thread;
 use car_app::map_renderer::{MapView, render_map};
 use car_app::spotify;
 use car_app::AppWindow;
+use car_app::hardware::{
+    self, SpeedSensor, FuelSensor, OdometerSensor, BlinkerSensor,
+    ChargeLightSensor, OilPressureLightSensor, HighBeamSensor,
+    IgnitionLightSensor, BlinkerState,
+};
 
 
 struct RenderRequest {
@@ -31,6 +36,7 @@ fn is_night_time_at(hour: u32) -> bool {
     !(6..18).contains(&hour)
 }
 
+#[cfg(test)]
 fn calculate_simulated_speed(elapsed: f32) -> i32 {
     let sin_val = (elapsed / 4.0).sin();
     (50.0 + 20.0 * sin_val) as i32
@@ -58,6 +64,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let current_dist = Rc::new(RefCell::new(0.0f32));
     let last_tick_time = Rc::new(RefCell::new(std::time::Instant::now()));
     
+    let mock_vehicle = Rc::new(RefCell::new(hardware::MockVehicleSystem::new()));
+    let mock_fuel = Rc::new(RefCell::new(hardware::MockFuelSensor::new(0.75, 0.005)));
+    let mock_odometer = Rc::new(RefCell::new(hardware::MockOdometerSensor::new(3.0)));
+
     let last_map_render_time = Rc::new(RefCell::new(std::time::Instant::now()));
     let last_requested_world_x = Rc::new(RefCell::new(33756.0f32));
     let last_requested_world_y = Rc::new(RefCell::new(21962.0f32));
@@ -363,7 +373,6 @@ fn main() -> Result<(), slint::PlatformError> {
     // Speed and driving simulation timer
     let ui_handle_speed = ui.as_weak();
     let speed_timer = slint::Timer::default();
-    let start_time = std::time::Instant::now();
 
     let offset_x_speed = offset_x.clone();
     let offset_y_speed = offset_y.clone();
@@ -379,19 +388,33 @@ fn main() -> Result<(), slint::PlatformError> {
     let last_req_world_y = last_requested_world_y.clone();
     let last_map_req_time = last_map_render_time.clone();
 
+    let mock_vehicle_speed = mock_vehicle.clone();
+    let mock_fuel_speed = mock_fuel.clone();
+    let mock_odometer_speed = mock_odometer.clone();
+
     speed_timer.start(
         slint::TimerMode::Repeated,
         std::time::Duration::from_millis(100),
         move || {
             if let Some(ui) = ui_handle_speed.upgrade() {
-                let elapsed = start_time.elapsed().as_secs_f32();
-                let simulated_speed = calculate_simulated_speed(elapsed);
-                ui.set_current_speed(simulated_speed);
-
                 // Get dt
                 let now = std::time::Instant::now();
                 let dt = now.duration_since(*last_tick_time_speed.borrow()).as_secs_f32();
                 *last_tick_time_speed.borrow_mut() = now;
+
+                // Update mock hardware
+                mock_vehicle_speed.borrow_mut().update(dt);
+                let current_speed = mock_vehicle_speed.borrow().speed_kph();
+
+                // Update UI Speedometer and indicators
+                ui.set_current_speed(current_speed as i32);
+                ui.set_charge_light_on(ChargeLightSensor::is_on(&*mock_vehicle_speed.borrow()));
+                ui.set_oil_light_on(OilPressureLightSensor::is_on(&*mock_vehicle_speed.borrow()));
+                ui.set_ignition_light_on(IgnitionLightSensor::is_on(&*mock_vehicle_speed.borrow()));
+                ui.set_high_beam_on(HighBeamSensor::is_on(&*mock_vehicle_speed.borrow()));
+
+                let blinker = mock_vehicle_speed.borrow().blinker_state();
+                ui.set_turn_signal_on(blinker != BlinkerState::AllOff);
 
                 // Check if simulation is paused due to manual drag
                 let is_paused = if let Some(until) = *pause_simulation_until_speed.borrow() {
@@ -401,10 +424,21 @@ fn main() -> Result<(), slint::PlatformError> {
                 };
 
                 if !is_paused {
+                    // Update odometer and fuel based on current_speed
+                    let delta_km = mock_odometer_speed.borrow_mut().update(dt, current_speed);
+                    mock_fuel_speed.borrow_mut().update(delta_km);
+
+                    // Update UI Fuel and Odometer
+                    ui.set_fuel_level(mock_fuel_speed.borrow().fuel_level());
+
+                    let odo_digits = hardware::format_odometer(mock_odometer_speed.borrow().odometer_km());
+                    let odo_model = Rc::new(slint::VecModel::from(odo_digits));
+                    ui.set_odometer(odo_model.into());
+
                     // Advance position along waypoints
                     // Speed is in km/h. Convert to tile units per second.
-                    // speed_in_tiles_per_second = simulated_speed * 0.0007218
-                    let delta_dist = (simulated_speed as f32) * 0.0007218 * dt;
+                    // speed_in_tiles_per_second = speed * 0.0007218
+                    let delta_dist = current_speed * 0.0007218 * dt;
                     let mut dist = *current_dist_speed.borrow_mut() + delta_dist;
                     if dist >= total_length {
                         dist %= total_length;
@@ -521,42 +555,7 @@ fn main() -> Result<(), slint::PlatformError> {
         },
     );
 
-    // Dashboard indicators simulation timer for demo purpose
-    let ui_handle_indicators = ui.as_weak();
-    let indicators_timer = slint::Timer::default();
-    let mut indicator_seed: u32 = 123456789;
-    
-    indicators_timer.start(
-        slint::TimerMode::Repeated,
-        std::time::Duration::from_millis(600),
-        move || {
-            if let Some(ui) = ui_handle_indicators.upgrade() {
-                // Linear Congruential Generator step to generate pseudo-random numbers
-                indicator_seed = indicator_seed.wrapping_mul(1103515245).wrapping_add(12345);
-                let rand_val = indicator_seed;
 
-                // Turn signal: regular blinking (active on even LCG ticks)
-                let turn_active = (rand_val & 0x01) == 0;
-                ui.set_turn_signal_on(turn_active);
-
-                // High beam: active ~30% of the time
-                let hb_active = (rand_val % 10) < 3;
-                ui.set_high_beam_on(hb_active);
-
-                // Charge/battery light: active ~30% of the time
-                let charge_active = ((rand_val >> 2) % 10) < 3;
-                ui.set_charge_light_on(charge_active);
-
-                // Oil light: active ~20% of the time
-                let oil_active = ((rand_val >> 4) % 10) < 2;
-                ui.set_oil_light_on(oil_active);
-
-                // Ignition light: active ~40% of the time
-                let ign_active = ((rand_val >> 6) % 10) < 4;
-                ui.set_ignition_light_on(ign_active);
-            }
-        },
-    );
 
     ui.run()
 }
