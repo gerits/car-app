@@ -1,15 +1,14 @@
-A high-performance car dashboard application built with **Rust** and **Slint**. It features a smooth speedometer, integrated vector maps, and real-time Spotify playback status.
+A high-performance car dashboard application built with **Rust** and **Slint**. It features a smooth speedometer and integrated vector maps.
 
 ![App Screenshot](assets/screenshot.png)
 
 
 ## Introduction
-The `car-app` is designed to demonstrate a modern, fluid automotive interface. It leverages Slint's reactive UI framework and Rust's safety and performance to provide a responsive experience, even with complex background tasks like vector map rendering and API polling.
+The `car-app` is designed to demonstrate a modern, fluid automotive interface. It leverages Slint's reactive UI framework and Rust's safety and performance to provide a responsive experience, even with complex background tasks like vector map rendering.
 
 ### Key Features
 - **Dynamic Speedometer**: A beautiful, arch-based speedometer with a simulated needle and scaling labels.
 - **Vector Map Integration**: Background-rendered maps using PMTiles and vector tiles, clipped to a circular dashboard view.
-- **Spotify Integration**: Real-time display of currently playing tracks, artists, and progress bars.
 - **Adaptive Theme**: Automatically switches between Light and Dark modes based on the time of day, with a manual override for testing.
 - **Responsive Design**: The UI scales proportionally to fit various window sizes and aspect ratios.
 
@@ -20,14 +19,6 @@ The `car-app` is designed to demonstrate a modern, fluid automotive interface. I
 - **C Compiler**: Needed for building some dependencies (e.g., `flate2`).
 - **Font Assets**: The app uses "Space Grotesk". Ensure fonts are present in the `assets/` directory.
 
-### Environment Setup
-1. Create or modify the `.env` file in the root directory with your Spotify API credentials:
-   ```env
-   SPOTIFY_CLIENT_ID=your_client_id
-   SPOTIFY_CLIENT_SECRET=your_client_secret
-   SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
-   ```
-2. On first run, the application will prompt you in the terminal to authorize the app via Spotify's OAuth flow.
 
 ### Building and Running
 To build and run the application in development mode:
@@ -82,17 +73,7 @@ This project adheres to a shared vocabulary to ensure consistency across the des
 | **Tile Cache** | An LRU cache storing pre-processed vector paths for map tiles. | `TILE_CACHE` |
 | **Render Request** | A message sent to the background thread to trigger a map redraw. | `RenderRequest` |
 
-### 4. Music Playback (Spotify Integration)
-| Term | Definition | Code Reference |
-| :--- | :--- | :--- |
-| **Spotify Display** | The integrated UI component showing current track info. | `Rectangle` (if spotify_playing) |
-| **Playback State** | The data snapshot of Spotify (track name, artist, progress). | `SpotifyState` |
-| **Spotify Client** | The service wrapper for the Spotify Web API. | `SpotifyClient` |
-| **Album Art** | The cover image of the currently playing album or track. | `spotify_album_art` |
-| **Track Progress** | A float (0.0 to 1.0) representing completion of the song. | `spotify_progress` |
-| **Polling Task** | The async background loop that updates playback every second. | `rt.spawn` (main.rs) |
-
-### 5. Domain Logic & Simulation
+### 4. Domain Logic & Simulation
 | Term | Definition | Code Reference |
 | :--- | :--- | :--- |
 | **Night Time Logic** | Logic determining if it is currently night (6 PM to 6 AM). | `is_night_time` |

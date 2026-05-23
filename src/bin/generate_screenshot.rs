@@ -10,10 +10,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set mock data for the screenshot
     ui.set_current_speed(78);
     ui.set_is_dark_mode(true);
-    ui.set_spotify_playing(true);
-    ui.set_spotify_track("Midnight City".into());
-    ui.set_spotify_artist("M83".into());
-    ui.set_spotify_progress(0.4);
 
     // Render the map background synchronously for the screenshot
     let view = MapView {

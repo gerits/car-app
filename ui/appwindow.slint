@@ -58,12 +58,6 @@ export component AppWindow inherits Window {
     in property <float> fuel_level: 0.75;
     in property <[string]> odometer: ["0", "0", "0", "0", "3", "0"];
     
-    // Spotify properties
-    in property <bool> spotify_playing: false;
-    in property <string> spotify_track: "";
-    in property <string> spotify_artist: "";
-    in property <float> spotify_progress: 0.0; // 0.0 to 1.0
-    in property <image> spotify_album_art;
 
     callback map_dragged(length, length);
     callback toggle_theme();
@@ -161,98 +155,6 @@ export component AppWindow inherits Window {
             viewbox-height: 30;
         }
 
-        // Integrated Spotify Display
-        if root.spotify_playing: Rectangle {
-            width: 280px * root.ui_scale;
-            height: 70px * root.ui_scale;
-            x: (parent.width - self.width) / 2;
-            y: parent.height * 0.72;
-            border-radius: 12px * root.ui_scale;
-            background: root.is_dark_mode ? rgba(15, 15, 15, 0.8) : rgba(255, 255, 255, 0.8);
-            border-width: 1px;
-            border-color: root.is_dark_mode ? rgba(255, 255, 255, 0.15) : rgba(0, 0, 0, 0.1);
-
-            // Subtle Spotify Logo
-            Path {
-                width: 14px * root.ui_scale;
-                height: 14px * root.ui_scale;
-                x: parent.width - self.width - 8px * root.ui_scale;
-                y: 8px * root.ui_scale;
-                fill: #1DB954;
-                opacity: 0.6;
-                viewbox-width: 100;
-                viewbox-height: 100;
-                commands: "M 50 0 C 22.4 0 0 22.4 0 50 C 0 77.6 22.4 100 50 100 C 77.6 100 100 77.6 100 50 C 100 22.4 77.6 0 50 0 Z M 73.1 72.1 C 72.2 73.5 70.3 74 68.9 73.1 C 57.1 65.9 42.2 64.3 24.8 68.3 C 23.2 68.7 21.6 67.7 21.2 66.1 C 20.8 64.5 21.8 62.9 23.4 62.5 C 42.5 58.1 58.9 60 72.1 68.1 C 73.5 69 74 70.8 73.1 72.1 Z M 79.4 58.6 C 78.2 60.5 75.7 61.1 73.8 59.9 C 60.3 51.6 39.8 49.2 24 54 C 21.8 54.7 19.5 53.5 18.8 51.3 C 18.1 49.1 19.3 46.8 21.5 46.1 C 39.5 40.7 62.1 43.4 77.9 53.1 C 79.8 54.2 80.5 56.7 79.4 58.6 Z M 80 44.5 C 64 35 37.4 34.1 22 38.8 C 19.5 39.6 16.9 38.2 16.1 35.7 C 15.3 33.2 16.7 30.6 19.2 29.8 C 37 24.4 66.4 25.4 84.8 36.3 C 87.1 37.7 87.8 40.7 86.4 43 C 85 45.3 82 46.1 79.7 44.7 L 80 44.5 Z";
-            }
-
-            HorizontalLayout {
-                padding: 8px * root.ui_scale;
-                spacing: 10px * root.ui_scale;
-                alignment: start;
-
-                // Album Art thumbnail
-                Rectangle {
-                    width: 54px * root.ui_scale;
-                    height: 54px * root.ui_scale;
-                    border-radius: 4px * root.ui_scale;
-                    clip: true;
-                    background: #121212;
-                    
-                    Image {
-                        source: root.spotify_album_art;
-                        width: 100%;
-                        height: 100%;
-                        image-fit: cover;
-                    }
-                }
-
-                VerticalLayout {
-                    spacing: 4px * root.ui_scale;
-                    alignment: center;
-
-                    VerticalLayout {
-                        spacing: 0;
-                        Text {
-                            text: root.spotify_track;
-                            font-size: 14px * root.ui_scale;
-                            font-family: "Space Grotesk";
-                            font-weight: 700;
-                            color: root.theme_foreground;
-                            overflow: elide;
-                        }
-                        Text {
-                            text: root.spotify_artist;
-                            font-size: 11px * root.ui_scale;
-                            font-family: "Space Grotesk";
-                            font-weight: 500;
-                            color: root.is_dark_mode ? rgba(255, 255, 255, 0.5) : rgba(0, 0, 0, 0.5);
-                            overflow: elide;
-                        }
-                    }
-
-                    Rectangle {
-                        height: 3px * root.ui_scale;
-                        width: 180px * root.ui_scale;
-                        background: root.is_dark_mode ? rgba(255, 255, 255, 0.15) : rgba(0, 0, 0, 0.15);
-                        border-radius: 1.5px * root.ui_scale;
-
-                        Rectangle {
-                            x: 0;
-                            y: 0;
-                            height: parent.height;
-                            width: parent.width * root.spotify_progress;
-                            background: #1DB954;
-                            border-radius: parent.border-radius;
-
-                            animate width {
-                                duration: 1000ms;
-                                easing: linear;
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // --- STATIC CACHED DASHBOARD ELEMENTS ---
