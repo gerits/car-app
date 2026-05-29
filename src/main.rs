@@ -64,6 +64,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let mock_odometer = Rc::new(RefCell::new(hardware::MockOdometerSensor::new(3.0)));
 
     let last_map_render_time = Rc::new(RefCell::new(std::time::Instant::now()));
+    let startup_time = Rc::new(std::time::Instant::now());
+    let first_render_finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let last_requested_world_x = Rc::new(RefCell::new(33756.0f32));
     let last_requested_world_y = Rc::new(RefCell::new(21962.0f32));
     ui.set_map_rendered_world_x(33756.0);
@@ -138,6 +140,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let (tx, rx) = mpsc::channel::<RenderRequest>();
 
     let ui_handle_thread = ui.as_weak();
+    let first_render_finished_thread = first_render_finished.clone();
     thread::spawn(move || {
         while let Ok(req) = rx.recv() {
             // Drain the channel to only process the LATEST request
@@ -165,12 +168,14 @@ fn main() -> Result<(), slint::PlatformError> {
             let req_world_x = latest_req.world_x;
             let req_world_y = latest_req.world_y;
 
+            let first_render_finished_inner = first_render_finished_thread.clone();
             let ui_handle_inner = ui_handle_thread.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_handle_inner.upgrade() {
                     ui.set_map_bg(slint::Image::from_rgba8_premultiplied(buffer));
                     ui.set_map_rendered_world_x(req_world_x);
                     ui.set_map_rendered_world_y(req_world_y);
+                    first_render_finished_inner.store(true, std::sync::atomic::Ordering::SeqCst);
                 }
             });
         }
@@ -302,6 +307,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let ui_handle_speed = ui.as_weak();
     let speed_timer = slint::Timer::default();
 
+    let loading_rot = Rc::new(RefCell::new(0.0f32));
+
     let offset_x_speed = offset_x.clone();
     let offset_y_speed = offset_y.clone();
     let rotation_degrees_speed = rotation_degrees.clone();
@@ -315,6 +322,9 @@ fn main() -> Result<(), slint::PlatformError> {
     let last_req_world_x = last_requested_world_x.clone();
     let last_req_world_y = last_requested_world_y.clone();
     let last_map_req_time = last_map_render_time.clone();
+    let loading_rot_speed = loading_rot.clone();
+    let startup_time_speed = startup_time.clone();
+    let first_render_finished_speed = first_render_finished.clone();
 
     let mock_vehicle_speed = mock_vehicle.clone();
     let mock_fuel_speed = mock_fuel.clone();
@@ -325,14 +335,33 @@ fn main() -> Result<(), slint::PlatformError> {
         std::time::Duration::from_millis(100),
         move || {
             if let Some(ui) = ui_handle_speed.upgrade() {
-                // Get dt
                 let now = std::time::Instant::now();
+                let elapsed_loading = now.duration_since(*startup_time_speed).as_secs_f32();
+                let is_render_finished = first_render_finished_speed.load(std::sync::atomic::Ordering::SeqCst);
+
+                // Animate radar sweeper if map is still loading
+                if !ui.get_map_loaded() {
+                    let mut r = *loading_rot_speed.borrow_mut();
+                    r = (r + 12.0) % 360.0;
+                    *loading_rot_speed.borrow_mut() = r;
+                    ui.set_loading_rotation(r);
+
+                    if is_render_finished && elapsed_loading >= 2.0 {
+                        ui.set_map_loaded(true);
+                    }
+                }
+
+                // Get dt
                 let dt = now.duration_since(*last_tick_time_speed.borrow()).as_secs_f32();
                 *last_tick_time_speed.borrow_mut() = now;
 
                 // Update mock hardware
                 mock_vehicle_speed.borrow_mut().update(dt);
-                let current_speed = mock_vehicle_speed.borrow().speed_kph();
+                let current_speed = if ui.get_map_loaded() {
+                    mock_vehicle_speed.borrow().speed_kph()
+                } else {
+                    0.0
+                };
 
                 // Update UI Speedometer and indicators
                 ui.set_current_speed(current_speed as i32);
@@ -351,7 +380,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     false
                 };
 
-                if !is_paused {
+                if !is_paused && ui.get_map_loaded() {
                     // Update odometer and fuel based on current_speed
                     let delta_km = mock_odometer_speed.borrow_mut().update(dt, current_speed);
                     mock_fuel_speed.borrow_mut().update(delta_km);

@@ -10,6 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set mock data for the screenshot
     ui.set_current_speed(78);
     ui.set_is_dark_mode(true);
+    ui.set_map_rendered_world_x(33756.0);
+    ui.set_map_rendered_world_y(21962.0);
+    ui.set_current_world_x(33756.0);
+    ui.set_current_world_y(21962.0);
 
     // Render the map background synchronously for the screenshot
     let view = MapView {
@@ -30,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0.0,
     );
     ui.set_map_bg(slint::Image::from_rgba8_premultiplied(buffer));
+    ui.set_map_loaded(true);
 
     // We need to show the window to initialize the renderer
     ui.show()?;

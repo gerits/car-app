@@ -28,6 +28,47 @@ component ModernCircularIndicator inherits Rectangle {
     }
 }
 
+component LiquidLoader inherits Rectangle {
+    in property <angle> loading_rotation;
+    in property <bool> is_dark_mode: true;
+    in property <color> primary_color: #FF8C00;
+
+    property <float> pulse_val: (sin(root.loading_rotation * 1.5) + 1.0) / 2.0;
+
+    width: 140px;
+    height: 140px;
+
+    // Organic blob center
+    Rectangle {
+        width: 44px + 6px * sin(root.loading_rotation * 3);
+        height: 44px + 6px * cos(root.loading_rotation * 2);
+        border-radius: self.width / 2;
+        background: root.primary_color;
+    }
+
+    // Droplet 1 (Orbits clockwise)
+    Rectangle {
+        width: 12px + 4px * root.pulse_val;
+        height: 12px + 4px * root.pulse_val;
+        border-radius: self.width / 2;
+        background: root.primary_color;
+        
+        x: parent.width / 2 + sin(root.loading_rotation) * 32px - self.width / 2;
+        y: parent.height / 2 - cos(root.loading_rotation) * 22px - self.height / 2;
+    }
+
+    // Droplet 2 (Orbits counter-clockwise, smaller)
+    Rectangle {
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: root.primary_color;
+        
+        x: parent.width / 2 + sin(-root.loading_rotation * 1.5 + 180deg) * 22px - self.width / 2;
+        y: parent.height / 2 - cos(-root.loading_rotation * 1.5 + 180deg) * 34px - self.height / 2;
+    }
+}
+
 export component AppWindow inherits Window {
     title: "Car App";
     preferred-width: 800px;
@@ -40,6 +81,8 @@ export component AppWindow inherits Window {
     in property <float> map_rendered_world_y: 0.0;
     in property <float> current_world_x: 33756.0;
     in property <float> current_world_y: 21962.0;
+    in property <bool> map_loaded: false;
+    in-out property <angle> loading_rotation: 0deg;
 
     property <float> map_scale: Math.max(root.display_size / 800px, root.display_size / 480px);
     property <length> map_pixels_per_unit: 512px * root.map_scale * 0.25;
@@ -86,6 +129,9 @@ export component AppWindow inherits Window {
             // Map renderer previously rotated by -rotation_degrees, so we match it here
             transform-rotation: -root.map_rotation;
 
+            opacity: root.map_loaded ? 1.0 : 0.0;
+            animate opacity { duration: 600ms; easing: ease-in-out; }
+
             Image {
                 width: 100%;
                 height: 100%;
@@ -94,6 +140,26 @@ export component AppWindow inherits Window {
                 // Shift the map image smoothly
                 x: root.map_shift_x;
                 y: root.map_shift_y;
+            }
+        }
+
+        // Loading Overlay
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            background: root.is_dark_mode ? #0C0C0B : #F4F4F6;
+            opacity: root.map_loaded ? 0.0 : 1.0;
+            visible: self.opacity > 0.01;
+
+            animate opacity { duration: 600ms; easing: ease-in-out; }
+
+            // Absolutely center the Liquid drop visualizer (directly under the car marker)
+            LiquidLoader {
+                loading_rotation: root.loading_rotation;
+                is_dark_mode: root.is_dark_mode;
+                primary_color: #FF8C00;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
             }
         }
 
