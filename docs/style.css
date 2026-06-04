@@ -1,0 +1,679 @@
+/* -------------------------------------------------------------
+   Design System & Variable Setup (Adaptive Theme Tokens)
+   ------------------------------------------------------------- */
+:root {
+    /* Fonts */
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'Fira Code', monospace;
+    
+    /* Layout Constants */
+    --transition-speed: 0.3s;
+    --transition-curve: cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Base HSL components to scale glows */
+    --accent-orange-hue: 33;
+    --accent-orange-sat: 100%;
+    --accent-orange-light: 50%;
+}
+
+/* --- Dark Theme (Instrument Black) --- */
+body.dark-theme {
+    --bg-primary: #0A0A0A;
+    --bg-secondary: #121212;
+    --bg-tertiary: #1A1A1A;
+    --fg-primary: #F4F1E1; /* Warm Instrument White */
+    --fg-secondary: #909088;
+    --fg-muted: #555550;
+    
+    /* Glow Colors */
+    --accent-orange: hsl(var(--accent-orange-hue), var(--accent-orange-sat), var(--accent-orange-light));
+    --accent-green: #00FF66;
+    --accent-blue: #0088FF;
+    --accent-red: #FF2A2A;
+    --accent-amber: #FF9900;
+    
+    /* Interactive Cards & Borders */
+    --glass-bg: rgba(18, 18, 18, 0.7);
+    --glass-border: rgba(244, 241, 225, 0.12);
+    --glass-shadow: rgba(0, 0, 0, 0.5);
+    --card-glow: rgba(255, 140, 0, 0.05);
+}
+
+/* --- Light Theme (Daylight Dashboard) --- */
+body.light-theme {
+    --bg-primary: #F4F4F6;
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: #EBEBEF;
+    --fg-primary: #353535; /* Crisp Dashboard Slate */
+    --fg-secondary: #656565;
+    --fg-muted: #A0A0A5;
+    
+    /* Glow Colors - Adjusted for Light Background Contrast */
+    --accent-orange: #E66B00;
+    --accent-green: #00B344;
+    --accent-blue: #0066CC;
+    --accent-red: #D91E1E;
+    --accent-amber: #D97700;
+    
+    /* Interactive Cards & Borders */
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(53, 53, 53, 0.12);
+    --glass-shadow: rgba(0, 0, 0, 0.06);
+    --card-glow: rgba(230, 107, 0, 0.04);
+}
+
+/* -------------------------------------------------------------
+   Base Resets & CSS Utilities
+   ------------------------------------------------------------- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    overflow-x: hidden;
+    transition: background-color var(--transition-speed) var(--transition-curve), 
+                color var(--transition-speed) var(--transition-curve);
+    position: relative;
+    min-height: 100vh;
+}
+
+/* --- Backdrop Ambient Glows --- */
+.ambient-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(140px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity var(--transition-speed) var(--transition-curve);
+}
+
+body.light-theme .ambient-glow {
+    opacity: 0.06;
+}
+
+.bg-glow-1 {
+    top: 5%;
+    right: -10%;
+    background: radial-gradient(circle, var(--accent-orange) 0%, transparent 70%);
+}
+
+.bg-glow-2 {
+    top: 60%;
+    left: -15%;
+    background: radial-gradient(circle, var(--accent-blue) 0%, transparent 70%);
+}
+
+/* --- Typographical Helpers --- */
+strong {
+    font-weight: 600;
+}
+
+/* -------------------------------------------------------------
+   Header & Navigation
+   ------------------------------------------------------------- */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: 0 4px 30px var(--glass-shadow);
+    transition: background var(--transition-speed), border-color var(--transition-speed);
+}
+
+.header-container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.brand-logo {
+    font-size: 1.8rem;
+    color: var(--accent-orange);
+    text-shadow: 0 0 15px rgba(255, 140, 0, 0.4);
+    animation: rotateLogo 8s linear infinite;
+}
+
+@keyframes rotateLogo {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(15deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.brand-text h1 {
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+.brand-text span {
+    font-size: 0.75rem;
+    color: var(--fg-secondary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.main-nav {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-link {
+    color: var(--fg-secondary);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: color 0.2s var(--transition-curve), transform 0.2s;
+    position: relative;
+    padding: 0.25rem 0;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: var(--accent-orange);
+    transition: width 0.25s var(--transition-curve);
+}
+
+.nav-link:hover {
+    color: var(--fg-primary);
+    transform: translateY(-1px);
+}
+
+.nav-link:hover::after {
+    width: 100%;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* --- Header Action Buttons --- */
+.icon-btn {
+    background: var(--bg-tertiary);
+    color: var(--fg-primary);
+    border: 1px solid var(--glass-border);
+    padding: 0.6rem;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    outline: none;
+}
+
+.icon-btn:hover {
+    background: var(--accent-orange);
+    color: #FFF;
+    border-color: var(--accent-orange);
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255, 140, 0, 0.4);
+}
+
+.github-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--fg-primary);
+    color: var(--bg-primary);
+    border: none;
+    padding: 0.55rem 1.2rem;
+    border-radius: 30px;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: opacity 0.25s, transform 0.25s, box-shadow 0.25s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.github-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+/* -------------------------------------------------------------
+   Hero & Speedometer Showcase Section
+   ------------------------------------------------------------- */
+.hero-section {
+    height: 600px;
+    position: relative;
+    overflow: hidden;
+    padding: 0 2rem;
+    z-index: 1;
+}
+
+.section-container {
+    max-width: 1200px;
+    height: 100%;
+    margin: 0 auto;
+    position: relative;
+}
+
+.hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 4rem;
+    align-items: center;
+    height: 100%;
+}
+
+.hero-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 0.4rem 1rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--fg-secondary);
+}
+
+.badge-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--accent-orange);
+    border-radius: 50%;
+    animation: blinkGlow 1.8s infinite;
+}
+
+@keyframes blinkGlow {
+    0%, 100% { opacity: 0.4; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px var(--accent-orange); }
+}
+
+.hero-title {
+    font-family: var(--font-heading);
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+}
+
+.accent-text {
+    background: linear-gradient(135deg, var(--accent-orange) 30%, var(--accent-amber) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+}
+
+.hero-desc {
+    font-size: 1.15rem;
+    color: var(--fg-secondary);
+    max-width: 540px;
+    line-height: 1.65;
+}
+
+.hero-ctas {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+/* --- Standard Action Buttons --- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.25s, transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+    outline: none;
+}
+
+.btn-primary {
+    background: var(--accent-orange);
+    color: #FFF;
+    border: none;
+    box-shadow: 0 8px 25px rgba(255, 140, 0, 0.3);
+}
+
+.btn-primary:hover {
+    background: hsl(var(--accent-orange-hue), var(--accent-orange-sat), calc(var(--accent-orange-light) - 5%));
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(255, 140, 0, 0.45);
+}
+
+.btn-secondary {
+    background: var(--glass-bg);
+    color: var(--fg-primary);
+    border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--fg-secondary);
+    transform: translateY(-2px);
+}
+
+/* -------------------------------------------------------------
+   Speedometer Screenshot Cropped Circle Mockup
+   ------------------------------------------------------------- */
+.circular-screenshot-container {
+    height: 110%;
+    width: auto;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+    position: relative;
+}
+
+.circular-screenshot {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    border: 8px solid var(--glass-border);
+    box-shadow: 0 25px 65px rgba(0, 0, 0, 0.5), 
+                inset 0 0 50px rgba(0, 0, 0, 0.8),
+                0 0 40px var(--card-glow);
+    background-color: #0c0c0b;
+    transition: border-color var(--transition-speed);
+}
+
+.circular-screenshot img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    height: 100%;
+    width: auto;
+    display: block;
+    user-select: none;
+}
+
+/* -------------------------------------------------------------
+   Specs & Technical Feature Cards
+   ------------------------------------------------------------- */
+.features-section {
+    padding: 6rem 2rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--glass-border);
+    transition: background-color var(--transition-speed);
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.section-header h2 {
+    font-family: var(--font-heading);
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.5px;
+}
+
+.section-header p {
+    color: var(--fg-secondary);
+    font-size: 1.05rem;
+    max-width: 580px;
+    margin: 0 auto;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.feature-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    transition: background var(--transition-speed), border-color var(--transition-speed), transform 0.25s, box-shadow 0.25s;
+    box-shadow: 0 10px 25px var(--glass-shadow);
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-orange);
+    box-shadow: 0 15px 35px var(--glass-shadow), 0 0 30px var(--card-glow);
+}
+
+.feature-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Palette Icons */
+.feature-icon.orange { background: rgba(255, 140, 0, 0.1); color: var(--accent-orange); }
+.feature-icon.green { background: rgba(0, 255, 102, 0.1); color: var(--accent-green); }
+.feature-icon.blue { background: rgba(0, 136, 255, 0.1); color: var(--accent-blue); }
+.feature-icon.red { background: rgba(255, 42, 42, 0.1); color: var(--accent-red); }
+.feature-icon.purple { background: rgba(160, 32, 240, 0.1); color: #B330E1; }
+.feature-icon.cyan { background: rgba(0, 188, 212, 0.1); color: #00BCD4; }
+
+.feature-card h3 {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.feature-card p {
+    color: var(--fg-secondary);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+/* -------------------------------------------------------------
+   Footer Layout
+   ------------------------------------------------------------- */
+.site-footer {
+    background: var(--bg-primary);
+    border-top: 1px solid var(--glass-border);
+    padding: 5rem 2rem 2rem 2rem;
+    transition: background-color var(--transition-speed), border-color var(--transition-speed);
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 4rem;
+    margin-bottom: 3.5rem;
+}
+
+.footer-left {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.footer-left .brand {
+    font-size: 1.2rem;
+}
+
+.footer-left p {
+    color: var(--fg-secondary);
+    font-size: 0.95rem;
+    max-width: 440px;
+}
+
+.footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.footer-links h4 {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.footer-links a {
+    color: var(--fg-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s var(--transition-curve);
+    align-self: flex-start;
+}
+
+.footer-links a:hover {
+    color: var(--accent-orange);
+}
+
+.footer-bottom {
+    max-width: 1200px;
+    margin: 0 auto;
+    border-top: 1px solid var(--glass-border);
+    padding-top: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-bottom p {
+    color: var(--fg-muted);
+    font-size: 0.85rem;
+}
+
+.socials {
+    display: flex;
+    gap: 1rem;
+}
+
+.socials a {
+    color: var(--fg-secondary);
+    font-size: 1.2rem;
+    transition: color 0.2s var(--transition-curve);
+}
+
+.socials a:hover {
+    color: var(--accent-orange);
+}
+
+/* -------------------------------------------------------------
+   Responsive Design & Media Queries
+   ------------------------------------------------------------- */
+@media (max-width: 1024px) {
+    .hero-section {
+        height: auto;
+        overflow: hidden;
+        padding: 6rem 2rem 4rem 2rem;
+    }
+    
+    .circular-screenshot-container {
+        height: auto;
+        width: 100%;
+        max-width: 460px;
+        aspect-ratio: 1 / 1;
+    }
+    
+    .hero-grid {
+        grid-template-columns: 1fr;
+        gap: 4rem;
+        height: auto;
+    }
+    
+    .hero-intro {
+        align-items: center;
+        text-align: center;
+    }
+    
+    .hero-desc {
+        max-width: 600px;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 1rem;
+    }
+    
+    .main-nav {
+        display: none; /* Hide nav links on tiny viewports */
+    }
+    
+    .hero-section {
+        padding: 4rem 1rem;
+    }
+    
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .circular-screenshot-container {
+        max-width: 320px;
+    }
+    
+    .features-section {
+        padding: 4rem 1rem;
+    }
+    
+    .footer-container {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+    }
+    
+    .footer-bottom {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+}

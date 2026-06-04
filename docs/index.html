@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car App — Modern Instrument Dashboard</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Explore a high-performance, real-time car dashboard interface. Features a fluid speedometer, adaptive night themes, and an integrated vector map renderer.">
+    <meta name="keywords" content="GUI, Speedometer, Dashboard, Automotive UI, Vector Maps, PMTiles, Embedded UI">
+    <meta name="author" content="Ruben Gerits">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Car App — Modern Instrument Dashboard">
+    <meta property="og:description" content="Experience a fluid automotive dashboard with a high-fidelity speedometer and integrated vector map rendering.">
+    <meta property="og:image" content="assets/screenshot.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Car App — Modern Instrument Dashboard">
+    <meta property="twitter:description" content="Experience a fluid automotive dashboard with a high-fidelity speedometer and integrated vector map rendering.">
+    <meta property="twitter:image" content="assets/screenshot.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icon Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <!-- Ambient Backdrop Glows -->
+    <div class="ambient-glow bg-glow-1"></div>
+    <div class="ambient-glow bg-glow-2"></div>
+    
+    <header class="site-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-gauge-high"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>CAR-APP</h1>
+                    <span>Instrument Dashboard</span>
+                </div>
+            </div>
+            <nav class="main-nav">
+                <a href="#hero" class="nav-link">Overview</a>
+                <a href="#features" class="nav-link">Features</a>
+            </nav>
+            <div class="header-actions">
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle visual theme" title="Toggle Theme">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+                <a href="https://github.com" target="_blank" class="github-btn" rel="noopener noreferrer">
+                    <i class="fa-brands fa-github"></i>
+                    <span>Repository</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="site-content">
+        <!-- Hero Section -->
+        <section id="hero" class="hero-section">
+            <div class="section-container hero-grid">
+                <div class="hero-intro">
+                    <div class="badge">
+                        <span class="badge-dot"></span> Interactive Instrument Interface
+                    </div>
+                    <h2 class="hero-title">Automotive UI, <br><span class="accent-text">Reimagined.</span></h2>
+                    <p class="hero-desc">
+                        A beautiful, reactive car instrument dashboard interface. Experience a fluid speedometer, adaptive theme profiles, and responsive vector tile map rendering clipped inside a physical circular dial.
+                    </p>
+                    
+                    <div class="hero-ctas">
+                        <a href="#features" class="btn btn-primary">
+                            Explore Specs
+                        </a>
+                        <a href="https://github.com" target="_blank" class="btn btn-secondary" rel="noopener noreferrer">
+                            <i class="fa-brands fa-github"></i> Repository
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="circular-screenshot-container">
+                    <div class="circular-screenshot">
+                        <img src="assets/screenshot.png" alt="Car Dashboard Speedometer Dial">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech features section -->
+        <section id="features" class="features-section">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2>Technical Specifications</h2>
+                </div>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon orange"><i class="fa-solid fa-microchip"></i></div>
+                        <h3>High-Performance Core</h3>
+                        <p>Leverages native multi-threading to coordinate tasks. Separates user interface updates from background processing to guarantee zero frame drops.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon green"><i class="fa-solid fa-compass-drafting"></i></div>
+                        <h3>Reactive Layout System</h3>
+                        <p>Constructed using a declarative composition model. Keeps states, layout scales, and coordinates bound together reactively for optimal visual presentation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon blue"><i class="fa-solid fa-map-location-dot"></i></div>
+                        <h3>Vector Tile Rendering</h3>
+                        <p>Background maps are loaded directly from cached vector data. Tiling and rendering happen on-the-fly, clipped and rasterized inside a circular mask.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon red"><i class="fa-solid fa-palette"></i></div>
+                        <h3>Time-Adaptive Themes</h3>
+                        <p>Includes built-in Night-Time logic which monitors clock coordinates (6 PM to 6 AM) to automatically switch the interface theme between high-contrast light and deep black.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon purple"><i class="fa-solid fa-expand"></i></div>
+                        <h3>Responsive UI Scaling</h3>
+                        <p>Coordinates display geometries via mathematical formulas. Guarantees perfect proportioning regardless of window scale.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon cyan"><i class="fa-solid fa-car-side"></i></div>
+                        <h3>Automotive Integration</h3>
+                        <p>Interfaces directly with vehicle communication buses to display live engine telemetry, electrical diagnostics, fuel levels, and real-time warning indicators.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-left">
+                <div class="brand">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <h2>CAR-APP</h2>
+                </div>
+                <p>An experimental showcase illustrating reactive layout scaling and offline-first vector map clipping inside a native application.</p>
+            </div>
+            <div class="footer-right">
+                <div class="footer-links">
+                    <h4>Navigation</h4>
+                    <a href="#hero">Overview</a>
+                    <a href="#features">Features</a>
+                    <a href="https://github.com" target="_blank" rel="noopener noreferrer">Repository</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Car-App Dashboard Project. Open-source under MIT License.</p>
+            <div class="socials">
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
