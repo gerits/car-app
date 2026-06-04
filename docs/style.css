@@ -3,9 +3,10 @@
    ------------------------------------------------------------- */
 :root {
     /* Fonts */
-    --font-heading: 'Space Grotesk', sans-serif;
+    --font-heading: 'Outfit', sans-serif;
     --font-body: 'Inter', sans-serif;
     --font-mono: 'Fira Code', monospace;
+    --font-wide: 'Syncopate', sans-serif;
     
     /* Layout Constants */
     --transition-speed: 0.3s;
@@ -40,14 +41,14 @@ body.dark-theme {
     --card-glow: rgba(255, 140, 0, 0.05);
 }
 
-/* --- Light Theme (Daylight Dashboard) --- */
+/* --- Light Theme (Warm Alabaster Cream) --- */
 body.light-theme {
-    --bg-primary: #F4F4F6;
+    --bg-primary: #FAF9F5; /* Matches gerits.dev */
     --bg-secondary: #FFFFFF;
-    --bg-tertiary: #EBEBEF;
-    --fg-primary: #353535; /* Crisp Dashboard Slate */
-    --fg-secondary: #656565;
-    --fg-muted: #A0A0A5;
+    --bg-tertiary: #F2EFE9;
+    --fg-primary: #2D2B28; /* Warm Dark Charcoal */
+    --fg-secondary: #5C5751;
+    --fg-muted: #938E86;
     
     /* Glow Colors - Adjusted for Light Background Contrast */
     --accent-orange: #E66B00;
@@ -57,10 +58,10 @@ body.light-theme {
     --accent-amber: #D97700;
     
     /* Interactive Cards & Borders */
-    --glass-bg: rgba(255, 255, 255, 0.75);
-    --glass-border: rgba(53, 53, 53, 0.12);
-    --glass-shadow: rgba(0, 0, 0, 0.06);
-    --card-glow: rgba(230, 107, 0, 0.04);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(45, 43, 40, 0.1);
+    --glass-shadow: rgba(45, 43, 40, 0.04);
+    --card-glow: rgba(230, 107, 0, 0.03);
 }
 
 /* -------------------------------------------------------------
@@ -174,9 +175,10 @@ strong {
 }
 
 .brand-text span {
-    font-size: 0.75rem;
+    font-family: var(--font-wide);
+    font-size: 0.58rem;
     color: var(--fg-secondary);
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     text-transform: uppercase;
 }
 
@@ -308,9 +310,10 @@ strong {
     border: 1px solid var(--glass-border);
     padding: 0.4rem 1rem;
     border-radius: 30px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
+    font-family: var(--font-wide);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1px;
     text-transform: uppercase;
     color: var(--fg-secondary);
 }
