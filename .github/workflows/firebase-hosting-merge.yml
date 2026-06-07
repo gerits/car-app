@@ -15,6 +15,6 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GERITS_CAR_DASHBOARD }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GERITS_CAR_APP }}
           channelId: live
-          projectId: gerits-car-dashboard
+          projectId: gerits-car-app

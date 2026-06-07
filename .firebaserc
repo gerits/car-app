@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "gerits-car-dashboard"
+    "default": "gerits-car-app"
   }
 }
+
