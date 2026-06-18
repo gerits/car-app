@@ -1,6 +1,6 @@
 A high-performance car dashboard application built with **Rust** and **Slint**. It features a smooth speedometer and integrated vector maps.
 
-![App Screenshot](assets/screenshot.png)
+![App Screenshot](docs/assets/screenshot.png)
 
 
 ## Introduction

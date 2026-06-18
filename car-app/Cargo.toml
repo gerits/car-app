@@ -1,0 +1,21 @@
+[package]
+name = "car-app"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+flate2 = { workspace = true }
+geo-types = { workspace = true }
+mvt-reader = { workspace = true }
+pmtiles2 = { workspace = true }
+slint = { workspace = true }
+tiny-skia = { workspace = true }
+lru = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+chrono = { workspace = true }
+image = { workspace = true }
+
+[build-dependencies]
+slint-build = { workspace = true }
