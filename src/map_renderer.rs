@@ -21,12 +21,38 @@ struct TilePaths {
     poi_area: Option<tiny_skia::Path>,
 }
 
+fn find_map_path() -> Option<std::path::PathBuf> {
+    if let Ok(env_path) = std::env::var("CAR_APP_MAP_PATH") {
+        let path = std::path::PathBuf::from(env_path);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    if let Ok(exe_path) = std::env::current_exe() {
+        let mut dir = exe_path.parent();
+        while let Some(path) = dir {
+            let candidate = path.join("assets/map.mbtiles");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+            dir = path.parent();
+        }
+    }
+    // Fallback to the current directory
+    let fallback = std::path::PathBuf::from("assets/map.mbtiles");
+    if fallback.exists() {
+        Some(fallback)
+    } else {
+        None
+    }
+}
+
 thread_local! {
     static PM: RefCell<Option<PMTiles<File>>> = RefCell::new({
-        match File::open("assets/map.mbtiles") {
-            Ok(f) => PMTiles::from_reader(f).ok(),
-            Err(e) => {
-                error!("Failed to open map asset: {}", e);
+        match find_map_path().and_then(|p| File::open(p).ok()) {
+            Some(f) => PMTiles::from_reader(f).ok(),
+            None => {
+                error!("Failed to open map asset: map.mbtiles not found in executable directory search paths or current directory");
                 None
             }
         }
