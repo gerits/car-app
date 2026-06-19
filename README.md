@@ -30,17 +30,6 @@ To build for production with optimizations:
 ```bash
 cargo build --release
 ```
-
-### Keeping the Screenshot Up to Date
-The project includes a utility to automatically generate a fresh screenshot of the UI. This ensures the README always reflects the current state of the application.
-
-To update the screenshot:
-```bash
-cargo run --bin generate_screenshot
-```
-This will render the current UI to `assets/screenshot.png`.
-
-
 ## Ubiquitous Language
 This project adheres to a shared vocabulary to ensure consistency across the design and code.
 

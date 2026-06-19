@@ -824,7 +824,6 @@ dependencies = [
  "env_logger",
  "flate2",
  "geo-types",
- "image",
  "log",
  "lru 0.13.0",
  "mvt-reader",

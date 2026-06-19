@@ -15,7 +15,6 @@ lru = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 chrono = { workspace = true }
-image = { workspace = true }
 
 [build-dependencies]
 slint-build = { workspace = true }

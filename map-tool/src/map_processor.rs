@@ -69,13 +69,44 @@ impl RoadClass {
 
 pub struct WayData {
     pub way_type: WayType,
-    pub nodes: Vec<i64>,
+    pub nodes: Vec<u32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pt {
     pub x: f64,
     pub y: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScaledPt {
+    pub lon_scaled: i32,
+    pub lat_scaled: i32,
+}
+
+impl ScaledPt {
+    pub const INVALID: Self = Self {
+        lon_scaled: i32::MIN,
+        lat_scaled: i32::MIN,
+    };
+
+    pub fn new(lon: f64, lat: f64) -> Self {
+        Self {
+            lon_scaled: (lon * 1e7).round() as i32,
+            lat_scaled: (lat * 1e7).round() as i32,
+        }
+    }
+
+    pub fn to_pt(&self) -> Pt {
+        Pt {
+            x: self.lon_scaled as f64 / 1e7,
+            y: self.lat_scaled as f64 / 1e7,
+        }
+    }
+
+    pub fn is_invalid(&self) -> bool {
+        self.lon_scaled == i32::MIN
+    }
 }
 
 // Custom reader wrapper to monitor read progress of the PBF files
@@ -365,8 +396,13 @@ pub fn run_conversion(
     // ----------------------------------------------------
     let _ = progress_tx.send(ProgressMessage::Pass1Start { total_files: pbf_files.len() });
     
-    let mut ways: FxHashMap<i64, WayData> = FxHashMap::default();
-    let mut referenced_nodes: FxHashSet<i64> = FxHashSet::default();
+    struct TempWay {
+        way_type: WayType,
+        nodes: Vec<i64>,
+    }
+    
+    let mut temp_ways: Vec<TempWay> = Vec::new();
+    let mut temp_node_refs: Vec<i64> = Vec::new();
     // Keep a list of POI points per tile (zoom 16)
     // Key: (tx, ty), Value: list of local coordinates
     let mut poi_points: FxHashMap<(u64, u64), Vec<Pt>> = FxHashMap::default();
@@ -439,10 +475,8 @@ pub fn run_conversion(
                     let mut tags = way.tags();
                     if let Some(way_type) = get_way_type(&mut tags, include_fuel, include_charging) {
                         let nodes: Vec<i64> = way.refs().collect();
-                        for &n_id in &nodes {
-                            referenced_nodes.insert(n_id);
-                        }
-                        ways.insert(way.id(), WayData { way_type, nodes });
+                        temp_node_refs.extend_from_slice(&nodes);
+                        temp_ways.push(TempWay { way_type, nodes });
                     }
                 }
                 _ => {}
@@ -450,11 +484,31 @@ pub fn run_conversion(
         }).map_err(|e| format!("Error parsing PBF in Pass 1: {}", e))?;
     }
 
+    // Sort and deduplicate referenced node IDs
+    temp_node_refs.sort_unstable();
+    temp_node_refs.dedup();
+    let referenced_nodes = temp_node_refs;
+
+    // Translate ways to index-based nodes
+    let mut ways = Vec::with_capacity(temp_ways.len());
+    for tw in temp_ways {
+        let mut node_indices = Vec::with_capacity(tw.nodes.len());
+        for &node_id in &tw.nodes {
+            if let Ok(idx) = referenced_nodes.binary_search(&node_id) {
+                node_indices.push(idx as u32);
+            }
+        }
+        ways.push(WayData {
+            way_type: tw.way_type,
+            nodes: node_indices,
+        });
+    }
+
     // ----------------------------------------------------
     // PASS 2: Scan node coordinates for referenced nodes
     // ----------------------------------------------------
     let _ = progress_tx.send(ProgressMessage::Pass2Start { total_files: pbf_files.len() });
-    let mut node_coords: FxHashMap<i64, Pt> = FxHashMap::default();
+    let mut node_coords = vec![ScaledPt::INVALID; referenced_nodes.len()];
 
     for (file_idx, path) in pbf_files.iter().enumerate() {
         let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
@@ -474,22 +528,48 @@ pub fn run_conversion(
         };
         let reader = ElementReader::new(BufReader::new(preader));
         
+        let mut ref_idx = 0;
         reader.for_each(|element| {
             match element {
                 Element::Node(node) => {
-                    if referenced_nodes.contains(&node.id()) {
-                        node_coords.insert(node.id(), Pt { x: node.lon(), y: node.lat() });
+                    let nid = node.id();
+                    if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
+                        while ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] < nid {
+                            ref_idx += 1;
+                        }
+                        if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid {
+                            node_coords[ref_idx] = ScaledPt::new(node.lon(), node.lat());
+                        }
+                    } else {
+                        // Fallback to binary search if node ID went backward
+                        if let Ok(idx) = referenced_nodes.binary_search(&nid) {
+                            node_coords[idx] = ScaledPt::new(node.lon(), node.lat());
+                        }
                     }
                 }
                 Element::DenseNode(dense) => {
-                    if referenced_nodes.contains(&dense.id()) {
-                        node_coords.insert(dense.id(), Pt { x: dense.lon(), y: dense.lat() });
+                    let nid = dense.id();
+                    if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
+                        while ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] < nid {
+                            ref_idx += 1;
+                        }
+                        if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid {
+                            node_coords[ref_idx] = ScaledPt::new(dense.lon(), dense.lat());
+                        }
+                    } else {
+                        // Fallback to binary search if node ID went backward
+                        if let Ok(idx) = referenced_nodes.binary_search(&nid) {
+                            node_coords[idx] = ScaledPt::new(dense.lon(), dense.lat());
+                        }
                     }
                 }
                 _ => {}
             }
         }).map_err(|e| format!("Error parsing PBF in Pass 2: {}", e))?;
     }
+
+    // We no longer need referenced_nodes. Free memory.
+    drop(referenced_nodes);
 
     // ----------------------------------------------------
     // PASS 3: Generate Tile Geometries
@@ -509,7 +589,7 @@ pub fn run_conversion(
     let total_ways = ways.len();
     let mut ways_processed = 0;
 
-    for (_, way_data) in ways {
+    for way_data in ways {
         ways_processed += 1;
         if ways_processed % 50000 == 0 {
             let _ = progress_tx.send(ProgressMessage::TileGenProgress {
@@ -521,13 +601,13 @@ pub fn run_conversion(
         // Resolve way coordinates
         let mut pts = Vec::with_capacity(way_data.nodes.len());
         let mut missing = false;
-        for &node_id in &way_data.nodes {
-            if let Some(&pt) = node_coords.get(&node_id) {
-                pts.push(pt);
-            } else {
+        for &node_idx in &way_data.nodes {
+            let scaled_pt = node_coords[node_idx as usize];
+            if scaled_pt.is_invalid() {
                 missing = true;
                 break;
             }
+            pts.push(scaled_pt.to_pt());
         }
         
         if missing || pts.is_empty() {
