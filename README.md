@@ -21,14 +21,43 @@ The `car-app` is designed to demonstrate a modern, fluid automotive interface. I
 
 
 ### Building and Running
-To build and run the application in development mode:
+The project includes a `Makefile` to simplify common development tasks.
+
+To display all available targets and descriptions:
 ```bash
-cargo run
+make help
+```
+
+To build the workspace:
+```bash
+make build
+```
+
+To run the application with the default map:
+```bash
+make run
+```
+
+To run the application with interactive map selection:
+```bash
+make run-interactive
+```
+
+To run the application with a specific map file:
+```bash
+make run MAP=path/to/map.pmtiles
+```
+
+To run formatting, linting, or tests:
+```bash
+make fmt
+make lint
+make test
 ```
 
 To build for production with optimizations:
 ```bash
-cargo build --release
+make build-release
 ```
 ## Ubiquitous Language
 This project adheres to a shared vocabulary to ensure consistency across the design and code.

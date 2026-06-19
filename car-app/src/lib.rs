@@ -1,5 +1,4 @@
-pub mod map_renderer;
 pub mod hardware;
+pub mod map_renderer;
 
 slint::include_modules!();
-

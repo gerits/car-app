@@ -105,7 +105,9 @@ pub struct MockOdometerSensor {
 impl MockOdometerSensor {
     /// Creates a new `MockOdometerSensor` starting at the given distance.
     pub fn new(initial_km: f64) -> Self {
-        Self { total_km: initial_km }
+        Self {
+            total_km: initial_km,
+        }
     }
 
     /// Simulates driving at a speed for dt seconds, returning distance traveled in km.
@@ -291,22 +293,13 @@ mod tests {
 
     #[test]
     fn test_format_odometer() {
-        assert_eq!(
-            format_odometer(3.0),
-            vec!["0", "0", "0", "0", "3", "0"]
-        );
+        assert_eq!(format_odometer(3.0), vec!["0", "0", "0", "0", "3", "0"]);
         assert_eq!(
             format_odometer(123.45),
             vec!["0", "0", "1", "2", "3", "5"] // rounded from 123.45 -> 1234.5 tenths -> 1235
         );
-        assert_eq!(
-            format_odometer(99999.9),
-            vec!["9", "9", "9", "9", "9", "9"]
-        );
-        assert_eq!(
-            format_odometer(-10.0),
-            vec!["0", "0", "0", "0", "0", "0"]
-        );
+        assert_eq!(format_odometer(99999.9), vec!["9", "9", "9", "9", "9", "9"]);
+        assert_eq!(format_odometer(-10.0), vec!["0", "0", "0", "0", "0", "0"]);
     }
 
     #[test]
@@ -331,7 +324,7 @@ mod tests {
     #[test]
     fn test_mock_vehicle_system_startup() {
         let mut sys = MockVehicleSystem::new();
-        
+
         // At start: Self-test phase. Warning lights should be solid ON.
         assert!(ChargeLightSensor::is_on(&sys)); // charge light
         assert!(<MockVehicleSystem as OilPressureLightSensor>::is_on(&sys));
@@ -344,7 +337,7 @@ mod tests {
         // Advance past 1.5 seconds cranking: Running phase.
         sys.update(1.6);
         assert_eq!(sys.ignition_phase, MockIgnitionPhase::Running);
-        
+
         // Warning lights should be OFF in running state.
         assert!(!ChargeLightSensor::is_on(&sys));
         assert!(!<MockVehicleSystem as OilPressureLightSensor>::is_on(&sys));

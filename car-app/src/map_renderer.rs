@@ -175,11 +175,15 @@ pub fn render_map(
             let min_visible_y = center_car_y - radius;
             let max_visible_y = center_car_y + radius;
 
-            let min_dx = ((min_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 - 1;
-            let max_dx = ((max_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
+            let min_dx =
+                ((min_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 - 1;
+            let max_dx =
+                ((max_visible_x - scaled_offset_x - start_x) / tile_size).floor() as i32 + 1;
 
-            let min_dy = ((min_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 - 1;
-            let max_dy = ((max_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
+            let min_dy =
+                ((min_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 - 1;
+            let max_dy =
+                ((max_visible_y - scaled_offset_y - start_y) / tile_size).floor() as i32 + 1;
 
             for dx in min_dx..=max_dx {
                 for dy in min_dy..=max_dy {
@@ -277,7 +281,9 @@ pub fn render_map(
                                                             properties.get("class")
                                                     {
                                                         match val.as_str() {
-                                                            "secondary" | "tertiary" | "unclassified" | "primary" | "residential" | "motorway" => {
+                                                            "secondary" | "tertiary"
+                                                            | "unclassified" | "primary"
+                                                            | "residential" | "motorway" => {
                                                                 is_major = true;
                                                             }
                                                             _ => {}
@@ -309,43 +315,42 @@ pub fn render_map(
                                             }
                                         } else if (layer_name.contains("poi")
                                             || layer_name == "place")
-                                            && let Ok(features) = reader.get_features(i) {
-                                                for f in features {
-                                                    match f.get_geometry() {
-                                                        Geometry::Point(pt) => {
+                                            && let Ok(features) = reader.get_features(i)
+                                        {
+                                            for f in features {
+                                                match f.get_geometry() {
+                                                    Geometry::Point(pt) => {
+                                                        poi_point_pb.push_circle(
+                                                            pt.x(),
+                                                            pt.y(),
+                                                            2.5 * (4096.0 / 128.0),
+                                                        );
+                                                    }
+                                                    Geometry::MultiPoint(mp) => {
+                                                        for pt in mp {
                                                             poi_point_pb.push_circle(
                                                                 pt.x(),
                                                                 pt.y(),
                                                                 2.5 * (4096.0 / 128.0),
                                                             );
                                                         }
-                                                        Geometry::MultiPoint(mp) => {
-                                                            for pt in mp {
-                                                                poi_point_pb.push_circle(
-                                                                    pt.x(),
-                                                                    pt.y(),
-                                                                    2.5 * (4096.0 / 128.0),
-                                                                );
-                                                            }
-                                                        }
-                                                        Geometry::Polygon(poly) => {
+                                                    }
+                                                    Geometry::Polygon(poly) => add_polygon_to_pb(
+                                                        &mut poi_area_pb,
+                                                        poly.exterior().0.as_slice(),
+                                                    ),
+                                                    Geometry::MultiPolygon(mpoly) => {
+                                                        for poly in mpoly {
                                                             add_polygon_to_pb(
                                                                 &mut poi_area_pb,
                                                                 poly.exterior().0.as_slice(),
-                                                            )
+                                                            );
                                                         }
-                                                        Geometry::MultiPolygon(mpoly) => {
-                                                            for poly in mpoly {
-                                                                add_polygon_to_pb(
-                                                                    &mut poi_area_pb,
-                                                                    poly.exterior().0.as_slice(),
-                                                                );
-                                                            }
-                                                        }
-                                                        _ => {}
                                                     }
+                                                    _ => {}
                                                 }
                                             }
+                                        }
                                     }
                                     new_paths.water_fill = water_fill_pb.finish();
                                     new_paths.water_stroke = water_stroke_pb.finish();

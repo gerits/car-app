@@ -1,29 +1,29 @@
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Duration;
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 
 mod countries;
 mod map_processor;
 
 use countries::CONTINENTS;
-use map_processor::{run_conversion, ProgressMessage};
+use map_processor::{ProgressMessage, run_conversion};
 
 #[derive(Clone)]
 enum Screen {
@@ -77,25 +77,72 @@ pub static MAP_CHARS: &[&str] = &[
 ];
 
 pub static MAP_IDS: &[&[u8]] = &[
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 0, 0, 7, 7, 7, 7, 7, 0, 0, 7, 7, 7, 3, 3, 3, 3, 3, 7, 7, 7, 7, 3, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7],
-    &[7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 7, 0, 0, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-    &[7, 7, 7, 1, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 3, 3, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 4, 4, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 6, 1, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 2, 2, 2, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 7, 7, 7, 3, 3, 7, 3, 3, 3, 7, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 5, 3, 5, 5, 7, 7, 7, 7, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4, 7, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 5, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 5, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 7, 7, 7, 5, 5, 7, 7],
-    &[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7,
+        7, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7,
+        7, 0, 0, 7, 7, 7, 7, 7, 0, 0, 7, 7, 7, 3, 3, 3, 3, 3, 7, 7, 7, 7, 3, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7,
+        7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7,
+    ],
+    &[
+        7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 1, 1, 1, 1, 7, 0, 0, 7, 7, 7,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+    ],
+    &[
+        7, 7, 7, 1, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 3, 3, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 4,
+        4, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 6, 1, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 2, 2, 2, 7, 7, 7, 7, 7, 7, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 3, 3, 7, 7, 7, 3, 3, 7, 3, 3, 3, 7, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7,
+        7, 4, 4, 4, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 5, 3, 5, 5, 7, 7, 7, 7, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7,
+        7, 4, 4, 4, 4, 7, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 5, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 4, 4, 4, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 5, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 7, 7, 7, 5, 5, 7, 7,
+    ],
+    &[
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    ],
 ];
 
 fn get_map_lines(selected_continent_idx: usize) -> Vec<Line<'static>> {
-    let highlight_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+    let highlight_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
     let default_style = Style::default().fg(Color::Cyan);
     let ocean_style = Style::default().fg(Color::DarkGray);
 
@@ -106,7 +153,7 @@ fn get_map_lines(selected_continent_idx: usize) -> Vec<Line<'static>> {
         let mut spans = Vec::new();
         let mut current_idx: Option<u8> = None;
         let mut current_text = String::new();
-        
+
         let row_ids = MAP_IDS[y];
         let char_vec: Vec<char> = row_chars.chars().collect();
 
@@ -186,7 +233,8 @@ fn download_file(
     }
 
     let total_size = response.content_length();
-    let mut file = File::create(dest_path).map_err(|e| format!("Failed to create download file: {}", e))?;
+    let mut file =
+        File::create(dest_path).map_err(|e| format!("Failed to create download file: {}", e))?;
     let mut buffer = [0; 8192];
     let mut downloaded = 0;
 
@@ -256,7 +304,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("Running map-tool in headless mode...");
             println!("Input PBFs: {:?}", pbf_files);
-            println!("Include Fuel: {}, Include Charging Stations: {}", include_fuel, include_charging);
+            println!(
+                "Include Fuel: {}, Include Charging Stations: {}",
+                include_fuel, include_charging
+            );
             if use_diepenbeek {
                 println!("Diepenbeek bounding box active: {:?}", bbox);
             }
@@ -270,11 +321,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let progress_handle = thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
                     match msg {
-                        ProgressMessage::Pass1Progress { file_name, percentage, .. } => {
+                        ProgressMessage::Pass1Progress {
+                            file_name,
+                            percentage,
+                            ..
+                        } => {
                             print!("\rPass 1: Parsing {} ({}%)", file_name, percentage);
                             let _ = std::io::stdout().flush();
                         }
-                        ProgressMessage::Pass2Progress { file_name, percentage, .. } => {
+                        ProgressMessage::Pass2Progress {
+                            file_name,
+                            percentage,
+                            ..
+                        } => {
                             print!("\rPass 2: Parsing {} ({}%)", file_name, percentage);
                             let _ = std::io::stdout().flush();
                         }
@@ -294,7 +353,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             });
 
-            let result = run_conversion(&pbf_files, output_file, include_fuel, include_charging, bbox, tx);
+            let result = run_conversion(
+                &pbf_files,
+                output_file,
+                include_fuel,
+                include_charging,
+                bbox,
+                tx,
+            );
             let _ = progress_handle.join();
 
             match result {
@@ -368,16 +434,20 @@ fn run_app<B: ratatui::backend::Backend>(
                             downloaded,
                             total,
                         } => {
-                            if let Some(idx) = download_status.iter().position(|(c, _, _)| c == &country) {
+                            if let Some(idx) =
+                                download_status.iter().position(|(c, _, _)| c == &country)
+                            {
                                 download_status[idx] = (country, downloaded, total);
                             }
                         }
                         ProgressMessage::DownloadComplete { country } => {
                             log_messages.push(format!("Finished download of {}!", country));
-                             if let Some(idx) = download_status.iter().position(|(c, _, _)| c == &country) {
-                                 let total = download_status[idx].2;
-                                 download_status[idx].1 = total.unwrap_or(download_status[idx].1);
-                             }
+                            if let Some(idx) =
+                                download_status.iter().position(|(c, _, _)| c == &country)
+                            {
+                                let total = download_status[idx].2;
+                                download_status[idx].1 = total.unwrap_or(download_status[idx].1);
+                            }
                         }
                         ProgressMessage::Pass1Start { total_files } => {
                             log_messages.push(format!(
@@ -410,7 +480,8 @@ fn run_app<B: ratatui::backend::Backend>(
                             *phase_percentage = percentage;
                         }
                         ProgressMessage::TileGenStart => {
-                            log_messages.push("Pass 3: Projecting and clipping geometries...".to_string());
+                            log_messages
+                                .push("Pass 3: Projecting and clipping geometries...".to_string());
                             *phase = "Pass 3: Clipping Geometries".to_string();
                             *phase_percentage = 0;
                         }
@@ -466,7 +537,8 @@ fn run_app<B: ratatui::backend::Backend>(
                                 }
                             }
                             KeyCode::Enter => {
-                                let selections = vec![false; CONTINENTS[*continent_index].countries.len()];
+                                let selections =
+                                    vec![false; CONTINENTS[*continent_index].countries.len()];
                                 app.screen = Screen::CountrySelect {
                                     continent_index: *continent_index,
                                     cursor_index: 0,
@@ -565,7 +637,8 @@ fn run_app<B: ratatui::backend::Backend>(
                                     let mut selected = Vec::new();
                                     for (idx, &sel) in selections.iter().enumerate() {
                                         if sel {
-                                            selected.push(&CONTINENTS[continent_index].countries[idx]);
+                                            selected
+                                                .push(&CONTINENTS[continent_index].countries[idx]);
                                         }
                                     }
 
@@ -576,7 +649,9 @@ fn run_app<B: ratatui::backend::Backend>(
                                         let mut paths = Vec::new();
                                         let countries_info: Vec<(String, String)> = selected
                                             .iter()
-                                            .map(|c| (c.name.to_string(), c.geofabrik_path.to_string()))
+                                            .map(|c| {
+                                                (c.name.to_string(), c.geofabrik_path.to_string())
+                                            })
                                             .collect();
 
                                         let inc_fuel = *include_fuel;
@@ -611,17 +686,18 @@ fn run_app<B: ratatui::backend::Backend>(
                                                 if let Err(e) =
                                                     download_file(&url, &dest_path, &name, &tx)
                                                 {
-                                                    let _ = tx.send(ProgressMessage::Error(format!(
-                                                        "Download failed: {}",
-                                                        e
-                                                    )));
+                                                    let _ = tx.send(ProgressMessage::Error(
+                                                        format!("Download failed: {}", e),
+                                                    ));
                                                     return;
                                                 }
                                                 paths.push(dest_path);
                                             }
 
-                                            let output_file = Path::new("target/assets/map.mbtiles");
-                                            let _ = fs::create_dir_all(output_file.parent().unwrap());
+                                            let output_file =
+                                                Path::new("target/assets/map.mbtiles");
+                                            let _ =
+                                                fs::create_dir_all(output_file.parent().unwrap());
 
                                             if let Err(e) = run_conversion(
                                                 &paths,
@@ -674,11 +750,19 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
 
     // 1. Header
     let header_text = vec![Line::from(vec![
-        Span::styled(" OSM Map Downloader & Converter (car-app) ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " OSM Map Downloader & Converter (car-app) ",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" - Pure Rust Pipeline", Style::default().fg(Color::Gray)),
     ])];
-    let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
+    let header = Paragraph::new(header_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
     f.render_widget(header, chunks[0]);
 
     // 2. Main Content
@@ -693,7 +777,9 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
             let mut list_items = Vec::new();
             for (idx, continent) in CONTINENTS.iter().enumerate() {
                 let style = if idx == continent_index {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(Color::White)
                 };
@@ -704,14 +790,21 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 )));
             }
 
-            let list = List::new(list_items)
-                .block(Block::default().borders(Borders::ALL).title(" Select Continent "));
+            let list = List::new(list_items).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Select Continent "),
+            );
             f.render_widget(list, main_chunks[0]);
 
             // Right: World Map
             let map_lines = get_map_lines(continent_index);
             let map_paragraph = Paragraph::new(map_lines)
-                .block(Block::default().borders(Borders::ALL).title(" World Map Visualizer "))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" World Map Visualizer "),
+                )
                 .wrap(Wrap { trim: false });
             f.render_widget(map_paragraph, main_chunks[1]);
         }
@@ -726,23 +819,26 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
             let mut list_items = Vec::new();
             for (idx, country) in continent.countries.iter().enumerate() {
                 let style = if idx == cursor_index {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(Color::White)
                 };
                 let indicator = if idx == cursor_index { " > " } else { "   " };
                 let checkbox = if selections[idx] { "[x] " } else { "[ ] " };
-                
+
                 list_items.push(ListItem::new(Span::styled(
                     format!("{}{}{}", indicator, checkbox, country.name),
                     style,
                 )));
             }
 
-            let list = List::new(list_items).block(Block::default().borders(Borders::ALL).title(format!(
-                " Select Countries in {} (Space to toggle, 'Enter' to proceed) ",
-                continent.name
-            )));
+            let list =
+                List::new(list_items).block(Block::default().borders(Borders::ALL).title(format!(
+                    " Select Countries in {} (Space to toggle, 'Enter' to proceed) ",
+                    continent.name
+                )));
             f.render_widget(list, chunks[1]);
         }
         Screen::PoiConfig {
@@ -752,36 +848,48 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
             ..
         } => {
             let mut list_items = Vec::new();
-            
+
             // Fuel option
             let fuel_style = if cursor_index == 0 {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
             let fuel_indicator = if cursor_index == 0 { " > " } else { "   " };
             let fuel_checkbox = if include_fuel { "[x] " } else { "[ ] " };
             list_items.push(ListItem::new(Span::styled(
-                format!("{}{}{}Include Gas Stations (fuel)", fuel_indicator, fuel_checkbox, ""),
+                format!(
+                    "{}{}{}Include Gas Stations (fuel)",
+                    fuel_indicator, fuel_checkbox, ""
+                ),
                 fuel_style,
             )));
 
             // Charging option
             let charging_style = if cursor_index == 1 {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
             let charging_indicator = if cursor_index == 1 { " > " } else { "   " };
             let charging_checkbox = if include_charging { "[x] " } else { "[ ] " };
             list_items.push(ListItem::new(Span::styled(
-                format!("{}{}{}Include EV Charging Stations (charging_station)", charging_indicator, charging_checkbox, ""),
+                format!(
+                    "{}{}{}Include EV Charging Stations (charging_station)",
+                    charging_indicator, charging_checkbox, ""
+                ),
                 charging_style,
             )));
 
             // Proceed Option
             let proceed_style = if cursor_index == 2 {
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
@@ -791,7 +899,11 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 proceed_style,
             )));
 
-            let list = List::new(list_items).block(Block::default().borders(Borders::ALL).title(" Configure Map Points of Interest (POIs) "));
+            let list = List::new(list_items).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Configure Map Points of Interest (POIs) "),
+            );
             f.render_widget(list, chunks[1]);
         }
         Screen::Progress {
@@ -815,12 +927,10 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 .split(chunks[1]);
 
             // Phase / Progress Bar
-            let mut text = vec![
-                Line::from(vec![
-                    Span::styled("Phase: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::styled(phase, Style::default().fg(Color::Green)),
-                ]),
-            ];
+            let mut text = vec![Line::from(vec![
+                Span::styled("Phase: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(phase, Style::default().fg(Color::Green)),
+            ])];
 
             if !complete && error.is_none() {
                 let width = progress_chunks[0].width.saturating_sub(4) as usize;
@@ -837,54 +947,77 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 )]));
             } else if let Some(err_msg) = error {
                 text.push(Line::from(vec![
-                    Span::styled("FAILED: ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "FAILED: ",
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(err_msg, Style::default().fg(Color::Red)),
                 ]));
             } else {
                 text.push(Line::from(vec![
-                    Span::styled("SUCCESS! ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!("Generated {} tiles.", total_tiles), Style::default().fg(Color::Green)),
+                    Span::styled(
+                        "SUCCESS! ",
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("Generated {} tiles.", total_tiles),
+                        Style::default().fg(Color::Green),
+                    ),
                 ]));
             }
 
-            let progress_para = Paragraph::new(text)
-                .block(Block::default().borders(Borders::ALL).title(" Progress Status "));
+            let progress_para = Paragraph::new(text).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Progress Status "),
+            );
             f.render_widget(progress_para, progress_chunks[0]);
 
             // Logs / Details
             let mut log_items = Vec::new();
-            
+
             // Show download progress if downloading
             if !download_status.is_empty() {
-                log_items.push(ListItem::new(Line::from(vec![
-                    Span::styled("Downloads:", Style::default().add_modifier(Modifier::UNDERLINED)),
-                ])));
+                log_items.push(ListItem::new(Line::from(vec![Span::styled(
+                    "Downloads:",
+                    Style::default().add_modifier(Modifier::UNDERLINED),
+                )])));
                 for (name, downloaded, total) in download_status {
                     let total_str = match total {
                         Some(t) => format!("{:.1} MB", *t as f64 / 1024.0 / 1024.0),
                         None => "Unknown size".to_string(),
                     };
                     let dl_mb = *downloaded as f64 / 1024.0 / 1024.0;
-                    
+
                     let dl_bar_str = if let Some(t) = total {
                         let bar_w = 20_usize;
                         let bar_filled = ((*downloaded as f64 / *t as f64) * bar_w as f64) as usize;
-                        format!(" [{}{}]", "=".repeat(bar_filled), " ".repeat(bar_w.saturating_sub(bar_filled)))
+                        format!(
+                            " [{}{}]",
+                            "=".repeat(bar_filled),
+                            " ".repeat(bar_w.saturating_sub(bar_filled))
+                        )
                     } else {
                         "".to_string()
                     };
 
                     log_items.push(ListItem::new(Line::from(vec![
                         Span::styled(format!(" - {}: ", name), Style::default().fg(Color::Cyan)),
-                        Span::styled(format!("{:.1} MB / {}{}", dl_mb, total_str, dl_bar_str), Style::default()),
+                        Span::styled(
+                            format!("{:.1} MB / {}{}", dl_mb, total_str, dl_bar_str),
+                            Style::default(),
+                        ),
                     ])));
                 }
                 log_items.push(ListItem::new(Line::from(vec![Span::raw("")])));
             }
 
-            log_items.push(ListItem::new(Line::from(vec![
-                Span::styled("Log Output:", Style::default().add_modifier(Modifier::UNDERLINED)),
-            ])));
+            log_items.push(ListItem::new(Line::from(vec![Span::styled(
+                "Log Output:",
+                Style::default().add_modifier(Modifier::UNDERLINED),
+            )])));
 
             // Show last 20 log lines
             let start = log_messages.len().saturating_sub(20);
@@ -899,8 +1032,11 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 log_items.push(ListItem::new(Span::styled(log.clone(), style)));
             }
 
-            let log_list = List::new(log_items)
-                .block(Block::default().borders(Borders::ALL).title(" Execution Details "));
+            let log_list = List::new(log_items).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Execution Details "),
+            );
             f.render_widget(log_list, progress_chunks[1]);
         }
     }
@@ -939,7 +1075,9 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
             Span::styled("Esc", Style::default().fg(Color::Yellow)),
             Span::raw(" Back"),
         ])],
-        Screen::Progress { complete, error, .. } => {
+        Screen::Progress {
+            complete, error, ..
+        } => {
             if *complete || error.is_some() {
                 vec![Line::from(vec![
                     Span::styled("Enter/Esc", Style::default().fg(Color::Yellow)),
@@ -947,14 +1085,22 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
                 ])]
             } else {
                 vec![Line::from(vec![
-                    Span::styled("Please wait...", Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC)),
+                    Span::styled(
+                        "Please wait...",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::ITALIC),
+                    ),
                     Span::raw(" Map generation is running in the background."),
                 ])]
             }
         }
     };
 
-    let footer = Paragraph::new(footer_text)
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
+    let footer = Paragraph::new(footer_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
     f.render_widget(footer, chunks[2]);
 }

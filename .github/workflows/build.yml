@@ -39,10 +39,16 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
 
+    - name: Check Formatting
+      run: make fmt-check
+
+    - name: Lint
+      run: make lint
+
     - name: Build
-      run: cargo build --verbose
+      run: make build
 
     - name: Run Tests
-      run: cargo test --verbose
+      run: make test
 
 

@@ -5,14 +5,12 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 
-use car_app::map_renderer::{MapView, render_map};
 use car_app::AppWindow;
 use car_app::hardware::{
-    self, SpeedSensor, FuelSensor, OdometerSensor, BlinkerSensor,
-    ChargeLightSensor, OilPressureLightSensor, HighBeamSensor,
-    IgnitionLightSensor, BlinkerState,
+    self, BlinkerSensor, BlinkerState, ChargeLightSensor, FuelSensor, HighBeamSensor,
+    IgnitionLightSensor, OdometerSensor, OilPressureLightSensor, SpeedSensor,
 };
-
+use car_app::map_renderer::{MapView, render_map};
 
 struct RenderRequest {
     offset_x: f32,
@@ -58,7 +56,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let pause_simulation_until = Rc::new(RefCell::new(None::<std::time::Instant>));
     let current_dist = Rc::new(RefCell::new(0.0f32));
     let last_tick_time = Rc::new(RefCell::new(std::time::Instant::now()));
-    
+
     let mock_vehicle = Rc::new(RefCell::new(hardware::MockVehicleSystem::new()));
     let mock_fuel = Rc::new(RefCell::new(hardware::MockFuelSensor::new(0.75, 0.005)));
     let mock_odometer = Rc::new(RefCell::new(hardware::MockOdometerSensor::new(3.0)));
@@ -181,7 +179,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-
     let initial_size = ui.window().size();
     let display_size = initial_size.width.min(initial_size.height);
     let map_sz = (display_size as f32 * 1.5) as u32;
@@ -212,7 +209,8 @@ fn main() -> Result<(), slint::PlatformError> {
         *offset_y_clone.borrow_mut() += dy;
 
         // Pause simulation for 5 seconds when manually dragged
-        *pause_simulation_until_drag.borrow_mut() = Some(std::time::Instant::now() + std::time::Duration::from_secs(5));
+        *pause_simulation_until_drag.borrow_mut() =
+            Some(std::time::Instant::now() + std::time::Duration::from_secs(5));
 
         if let Some(ui) = ui_handle_drag.upgrade() {
             let sz = ui.window().size();
@@ -337,7 +335,8 @@ fn main() -> Result<(), slint::PlatformError> {
             if let Some(ui) = ui_handle_speed.upgrade() {
                 let now = std::time::Instant::now();
                 let elapsed_loading = now.duration_since(*startup_time_speed).as_secs_f32();
-                let is_render_finished = first_render_finished_speed.load(std::sync::atomic::Ordering::SeqCst);
+                let is_render_finished =
+                    first_render_finished_speed.load(std::sync::atomic::Ordering::SeqCst);
 
                 // Animate radar sweeper if map is still loading
                 if !ui.get_map_loaded() {
@@ -352,7 +351,9 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
 
                 // Get dt
-                let dt = now.duration_since(*last_tick_time_speed.borrow()).as_secs_f32();
+                let dt = now
+                    .duration_since(*last_tick_time_speed.borrow())
+                    .as_secs_f32();
                 *last_tick_time_speed.borrow_mut() = now;
 
                 // Update mock hardware
@@ -388,7 +389,8 @@ fn main() -> Result<(), slint::PlatformError> {
                     // Update UI Fuel and Odometer
                     ui.set_fuel_level(mock_fuel_speed.borrow().fuel_level());
 
-                    let odo_digits = hardware::format_odometer(mock_odometer_speed.borrow().odometer_km());
+                    let odo_digits =
+                        hardware::format_odometer(mock_odometer_speed.borrow().odometer_km());
                     let odo_model = Rc::new(slint::VecModel::from(odo_digits));
                     ui.set_odometer(odo_model.into());
 
@@ -440,7 +442,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     } else if diff < -180.0 {
                         diff += 360.0;
                     }
-                    
+
                     let mut smooth_rot = current_rot + diff * 0.05;
                     if smooth_rot < 0.0 {
                         smooth_rot += 360.0;
@@ -486,8 +488,10 @@ fn main() -> Result<(), slint::PlatformError> {
                     // Only request a new map frame if we moved more than 150 pixels or 2 seconds passed
                     // from our LAST REQUEST
                     let dist_sq = req_shift_x * req_shift_x + req_shift_y * req_shift_y;
-                    let time_since_render = now.duration_since(*last_map_req_time.borrow()).as_secs_f32();
-                    
+                    let time_since_render = now
+                        .duration_since(*last_map_req_time.borrow())
+                        .as_secs_f32();
+
                     if dist_sq > 150.0 * 150.0 || time_since_render > 2.0 {
                         *last_req_world_x.borrow_mut() = current_world_x;
                         *last_req_world_y.borrow_mut() = current_world_y;
@@ -511,8 +515,6 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         },
     );
-
-
 
     ui.run()
 }

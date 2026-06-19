@@ -6,8 +6,8 @@ use std::sync::mpsc::Sender;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use mvt::{GeomEncoder, GeomType, Tile as MvtTile};
-use pmtiles2::{PMTiles, TileType, Compression as PmCompression};
 use pmtiles2::util::tile_id;
+use pmtiles2::{Compression as PmCompression, PMTiles, TileType};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use osmpbf::{Element, ElementReader};
@@ -15,22 +15,48 @@ use osmpbf::{Element, ElementReader};
 // Progress Message enum to communicate back to the TUI main thread
 #[allow(dead_code)]
 pub enum ProgressMessage {
-    DownloadStart { country: String },
-    DownloadProgress { country: String, downloaded: u64, total: Option<u64> },
-    DownloadComplete { country: String },
-    
-    Pass1Start { total_files: usize },
-    Pass1Progress { file_index: usize, file_name: String, percentage: u8 },
-    
-    Pass2Start { total_files: usize },
-    Pass2Progress { file_index: usize, file_name: String, percentage: u8 },
-    
+    DownloadStart {
+        country: String,
+    },
+    DownloadProgress {
+        country: String,
+        downloaded: u64,
+        total: Option<u64>,
+    },
+    DownloadComplete {
+        country: String,
+    },
+
+    Pass1Start {
+        total_files: usize,
+    },
+    Pass1Progress {
+        file_index: usize,
+        file_name: String,
+        percentage: u8,
+    },
+
+    Pass2Start {
+        total_files: usize,
+    },
+    Pass2Progress {
+        file_index: usize,
+        file_name: String,
+        percentage: u8,
+    },
+
     TileGenStart,
-    TileGenProgress { current: usize, total: usize },
-    
+    TileGenProgress {
+        current: usize,
+        total: usize,
+    },
+
     WritingStart,
-    Complete { output_file: PathBuf, total_tiles: usize },
-    
+    Complete {
+        output_file: PathBuf,
+        total_tiles: usize,
+    },
+
     Error(String),
 }
 
@@ -216,16 +242,21 @@ fn get_way_type<'a>(
 
     if is_road {
         if let Some(val) = highway_val {
-            return Some(WayType::Road { class: classify_highway(val) });
+            return Some(WayType::Road {
+                class: classify_highway(val),
+            });
         }
     }
 
     // A waterway feature is either tagged with a "waterway" key,
     // or tagged with "natural=water" with a "water" sub-tag of river, canal, stream, ditch, lock, or riverbank.
-    let is_waterway_feature = has_waterway || (has_natural_water && match water_val {
-        Some("river") | Some("canal") | Some("stream") | Some("ditch") | Some("lock") | Some("riverbank") => true,
-        _ => false,
-    });
+    let is_waterway_feature = has_waterway
+        || (has_natural_water
+            && match water_val {
+                Some("river") | Some("canal") | Some("stream") | Some("ditch") | Some("lock")
+                | Some("riverbank") => true,
+                _ => false,
+            });
 
     if is_waterway_feature {
         return Some(WayType::Waterway);
@@ -254,23 +285,35 @@ fn is_relevant_node<'a>(
 
 // Cohen-Sutherland line clipping helpers
 const INSIDE: i32 = 0; // 0000
-const LEFT: i32 = 1;   // 0001
-const RIGHT: i32 = 2;  // 0010
+const LEFT: i32 = 1; // 0001
+const RIGHT: i32 = 2; // 0010
 const BOTTOM: i32 = 4; // 0100
-const TOP: i32 = 8;    // 1000
+const TOP: i32 = 8; // 1000
 
 fn compute_out_code(x: f64, y: f64, xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> i32 {
     let mut code = INSIDE;
-    if x < xmin { code |= LEFT; }
-    else if x > xmax { code |= RIGHT; }
-    if y < ymin { code |= BOTTOM; }
-    else if y > ymax { code |= TOP; }
+    if x < xmin {
+        code |= LEFT;
+    } else if x > xmax {
+        code |= RIGHT;
+    }
+    if y < ymin {
+        code |= BOTTOM;
+    } else if y > ymax {
+        code |= TOP;
+    }
     code
 }
 
 fn clip_segment(
-    mut x0: f64, mut y0: f64, mut x1: f64, mut y1: f64,
-    xmin: f64, ymin: f64, xmax: f64, ymax: f64
+    mut x0: f64,
+    mut y0: f64,
+    mut x1: f64,
+    mut y1: f64,
+    xmin: f64,
+    ymin: f64,
+    xmax: f64,
+    ymax: f64,
 ) -> Option<(f64, f64, f64, f64)> {
     let mut code0 = compute_out_code(x0, y0, xmin, ymin, xmax, ymax);
     let mut code1 = compute_out_code(x1, y1, xmin, ymin, xmax, ymax);
@@ -297,10 +340,12 @@ fn clip_segment(
                 x = xmin;
             }
             if code_out == code0 {
-                x0 = x; y0 = y;
+                x0 = x;
+                y0 = y;
                 code0 = compute_out_code(x0, y0, xmin, ymin, xmax, ymax);
             } else {
-                x1 = x; y1 = y;
+                x1 = x;
+                y1 = y;
                 code1 = compute_out_code(x1, y1, xmin, ymin, xmax, ymax);
             }
         }
@@ -309,12 +354,16 @@ fn clip_segment(
 
 pub fn clip_linestring(pts: &[Pt], xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> Vec<Vec<Pt>> {
     let mut lines = Vec::new();
-    if pts.is_empty() { return lines; }
+    if pts.is_empty() {
+        return lines;
+    }
     let mut current_line = Vec::new();
     for i in 0..pts.len() - 1 {
         let p0 = pts[i];
-        let p1 = pts[i+1];
-        if let Some((cx0, cy0, cx1, cy1)) = clip_segment(p0.x, p0.y, p1.x, p1.y, xmin, ymin, xmax, ymax) {
+        let p1 = pts[i + 1];
+        if let Some((cx0, cy0, cx1, cy1)) =
+            clip_segment(p0.x, p0.y, p1.x, p1.y, xmin, ymin, xmax, ymax)
+        {
             let cp0 = Pt { x: cx0, y: cy0 };
             let cp1 = Pt { x: cx1, y: cy1 };
             if current_line.is_empty() {
@@ -337,7 +386,9 @@ pub fn clip_linestring(pts: &[Pt], xmin: f64, ymin: f64, xmax: f64, ymax: f64) -
 
 // Sutherland-Hodgman Polygon Clipping
 pub fn clip_polygon(poly: &[Pt], xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> Vec<Pt> {
-    if poly.is_empty() { return Vec::new(); }
+    if poly.is_empty() {
+        return Vec::new();
+    }
     let mut current = poly.to_vec();
     current = clip_poly_edge(&current, xmin, false, true);
     current = clip_poly_edge(&current, xmax, false, false);
@@ -348,18 +399,30 @@ pub fn clip_polygon(poly: &[Pt], xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> 
 
 fn clip_poly_edge(ring: &[Pt], edge_pos: f64, is_horizontal: bool, is_greater: bool) -> Vec<Pt> {
     let mut output = Vec::new();
-    if ring.is_empty() { return output; }
+    if ring.is_empty() {
+        return output;
+    }
     let is_inside = |p: Pt| {
         let val = if is_horizontal { p.y } else { p.x };
-        if is_greater { val >= edge_pos } else { val <= edge_pos }
+        if is_greater {
+            val >= edge_pos
+        } else {
+            val <= edge_pos
+        }
     };
     let intersection = |p1: Pt, p2: Pt| {
         if is_horizontal {
             let t = (edge_pos - p1.y) / (p2.y - p1.y);
-            Pt { x: p1.x + t * (p2.x - p1.x), y: edge_pos }
+            Pt {
+                x: p1.x + t * (p2.x - p1.x),
+                y: edge_pos,
+            }
         } else {
             let t = (edge_pos - p1.x) / (p2.x - p1.x);
-            Pt { x: edge_pos, y: p1.y + t * (p2.y - p1.y) }
+            Pt {
+                x: edge_pos,
+                y: p1.y + t * (p2.y - p1.y),
+            }
         }
     };
     let mut s = ring[ring.len() - 1];
@@ -389,18 +452,20 @@ pub fn run_conversion(
     include_fuel: bool,
     include_charging: bool,
     bbox: Option<(u64, u64, u64, u64)>,
-    progress_tx: Sender<ProgressMessage>
+    progress_tx: Sender<ProgressMessage>,
 ) -> Result<(), String> {
     // ----------------------------------------------------
     // PASS 1: Scan Ways and POI Nodes
     // ----------------------------------------------------
-    let _ = progress_tx.send(ProgressMessage::Pass1Start { total_files: pbf_files.len() });
-    
+    let _ = progress_tx.send(ProgressMessage::Pass1Start {
+        total_files: pbf_files.len(),
+    });
+
     struct TempWay {
         way_type: WayType,
         nodes: Vec<i64>,
     }
-    
+
     let mut temp_ways: Vec<TempWay> = Vec::new();
     let mut temp_node_refs: Vec<i64> = Vec::new();
     // Keep a list of POI points per tile (zoom 16)
@@ -408,11 +473,17 @@ pub fn run_conversion(
     let mut poi_points: FxHashMap<(u64, u64), Vec<Pt>> = FxHashMap::default();
 
     for (file_idx, path) in pbf_files.iter().enumerate() {
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let file = File::open(path).map_err(|e| format!("Failed to open PBF file: {}", e))?;
-        let metadata = file.metadata().map_err(|e| format!("Failed to read PBF metadata: {}", e))?;
+        let metadata = file
+            .metadata()
+            .map_err(|e| format!("Failed to read PBF metadata: {}", e))?;
         let total_bytes = metadata.len();
-        
+
         let preader = ProgressReader {
             inner: file,
             bytes_read: 0,
@@ -424,9 +495,9 @@ pub fn run_conversion(
             is_pass1: true,
         };
         let reader = ElementReader::new(BufReader::new(preader));
-        
-        reader.for_each(|element| {
-            match element {
+
+        reader
+            .for_each(|element| match element {
                 Element::Node(node) => {
                     let mut tags = node.tags();
                     if is_relevant_node(&mut tags, include_fuel, include_charging) {
@@ -434,19 +505,21 @@ pub fn run_conversion(
                         let ty = lat_to_tile_y(node.lat(), 16);
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
-                        
+
                         if let Some((min_x, max_x, min_y, max_y)) = bbox {
-                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y {
+                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
+                            {
                                 return;
                             }
                         }
-                        
+
                         let local_x = (tx - tile_x as f64) * 4096.0;
                         let local_y = (ty - tile_y as f64) * 4096.0;
-                        
-                        poi_points.entry((tile_x, tile_y))
-                            .or_default()
-                            .push(Pt { x: local_x, y: local_y });
+
+                        poi_points.entry((tile_x, tile_y)).or_default().push(Pt {
+                            x: local_x,
+                            y: local_y,
+                        });
                     }
                 }
                 Element::DenseNode(dense) => {
@@ -456,32 +529,35 @@ pub fn run_conversion(
                         let ty = lat_to_tile_y(dense.lat(), 16);
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
-                        
+
                         if let Some((min_x, max_x, min_y, max_y)) = bbox {
-                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y {
+                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
+                            {
                                 return;
                             }
                         }
-                        
+
                         let local_x = (tx - tile_x as f64) * 4096.0;
                         let local_y = (ty - tile_y as f64) * 4096.0;
-                        
-                        poi_points.entry((tile_x, tile_y))
-                            .or_default()
-                            .push(Pt { x: local_x, y: local_y });
+
+                        poi_points.entry((tile_x, tile_y)).or_default().push(Pt {
+                            x: local_x,
+                            y: local_y,
+                        });
                     }
                 }
                 Element::Way(way) => {
                     let mut tags = way.tags();
-                    if let Some(way_type) = get_way_type(&mut tags, include_fuel, include_charging) {
+                    if let Some(way_type) = get_way_type(&mut tags, include_fuel, include_charging)
+                    {
                         let nodes: Vec<i64> = way.refs().collect();
                         temp_node_refs.extend_from_slice(&nodes);
                         temp_ways.push(TempWay { way_type, nodes });
                     }
                 }
                 _ => {}
-            }
-        }).map_err(|e| format!("Error parsing PBF in Pass 1: {}", e))?;
+            })
+            .map_err(|e| format!("Error parsing PBF in Pass 1: {}", e))?;
     }
 
     // Sort and deduplicate referenced node IDs
@@ -507,15 +583,23 @@ pub fn run_conversion(
     // ----------------------------------------------------
     // PASS 2: Scan node coordinates for referenced nodes
     // ----------------------------------------------------
-    let _ = progress_tx.send(ProgressMessage::Pass2Start { total_files: pbf_files.len() });
+    let _ = progress_tx.send(ProgressMessage::Pass2Start {
+        total_files: pbf_files.len(),
+    });
     let mut node_coords = vec![ScaledPt::INVALID; referenced_nodes.len()];
 
     for (file_idx, path) in pbf_files.iter().enumerate() {
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let file = File::open(path).map_err(|e| format!("Failed to open PBF file: {}", e))?;
-        let metadata = file.metadata().map_err(|e| format!("Failed to read PBF metadata: {}", e))?;
+        let metadata = file
+            .metadata()
+            .map_err(|e| format!("Failed to read PBF metadata: {}", e))?;
         let total_bytes = metadata.len();
-        
+
         let preader = ProgressReader {
             inner: file,
             bytes_read: 0,
@@ -527,45 +611,53 @@ pub fn run_conversion(
             is_pass1: false,
         };
         let reader = ElementReader::new(BufReader::new(preader));
-        
+
         let mut ref_idx = 0;
-        reader.for_each(|element| {
-            match element {
-                Element::Node(node) => {
-                    let nid = node.id();
-                    if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
-                        while ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] < nid {
-                            ref_idx += 1;
-                        }
-                        if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid {
-                            node_coords[ref_idx] = ScaledPt::new(node.lon(), node.lat());
-                        }
-                    } else {
-                        // Fallback to binary search if node ID went backward
-                        if let Ok(idx) = referenced_nodes.binary_search(&nid) {
-                            node_coords[idx] = ScaledPt::new(node.lon(), node.lat());
-                        }
-                    }
-                }
-                Element::DenseNode(dense) => {
-                    let nid = dense.id();
-                    if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
-                        while ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] < nid {
-                            ref_idx += 1;
-                        }
-                        if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid {
-                            node_coords[ref_idx] = ScaledPt::new(dense.lon(), dense.lat());
-                        }
-                    } else {
-                        // Fallback to binary search if node ID went backward
-                        if let Ok(idx) = referenced_nodes.binary_search(&nid) {
-                            node_coords[idx] = ScaledPt::new(dense.lon(), dense.lat());
+        reader
+            .for_each(|element| {
+                match element {
+                    Element::Node(node) => {
+                        let nid = node.id();
+                        if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
+                            while ref_idx < referenced_nodes.len()
+                                && referenced_nodes[ref_idx] < nid
+                            {
+                                ref_idx += 1;
+                            }
+                            if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid
+                            {
+                                node_coords[ref_idx] = ScaledPt::new(node.lon(), node.lat());
+                            }
+                        } else {
+                            // Fallback to binary search if node ID went backward
+                            if let Ok(idx) = referenced_nodes.binary_search(&nid) {
+                                node_coords[idx] = ScaledPt::new(node.lon(), node.lat());
+                            }
                         }
                     }
+                    Element::DenseNode(dense) => {
+                        let nid = dense.id();
+                        if ref_idx < referenced_nodes.len() && nid >= referenced_nodes[ref_idx] {
+                            while ref_idx < referenced_nodes.len()
+                                && referenced_nodes[ref_idx] < nid
+                            {
+                                ref_idx += 1;
+                            }
+                            if ref_idx < referenced_nodes.len() && referenced_nodes[ref_idx] == nid
+                            {
+                                node_coords[ref_idx] = ScaledPt::new(dense.lon(), dense.lat());
+                            }
+                        } else {
+                            // Fallback to binary search if node ID went backward
+                            if let Ok(idx) = referenced_nodes.binary_search(&nid) {
+                                node_coords[idx] = ScaledPt::new(dense.lon(), dense.lat());
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        }).map_err(|e| format!("Error parsing PBF in Pass 2: {}", e))?;
+            })
+            .map_err(|e| format!("Error parsing PBF in Pass 2: {}", e))?;
     }
 
     // We no longer need referenced_nodes. Free memory.
@@ -575,7 +667,7 @@ pub fn run_conversion(
     // PASS 3: Generate Tile Geometries
     // ----------------------------------------------------
     let _ = progress_tx.send(ProgressMessage::TileGenStart);
-    
+
     // Grouped geometries per tile (zoom 16)
     // Key: (tx, ty) -> TileGeometries
     struct TileGeometries {
@@ -583,9 +675,9 @@ pub fn run_conversion(
         water_polys: Vec<Vec<Pt>>,
         water_lines: Vec<Vec<Pt>>,
     }
-    
+
     let mut tile_geoms: FxHashMap<(u64, u64), TileGeometries> = FxHashMap::default();
-    
+
     let total_ways = ways.len();
     let mut ways_processed = 0;
 
@@ -597,7 +689,7 @@ pub fn run_conversion(
                 total: total_ways,
             });
         }
-        
+
         // Resolve way coordinates
         let mut pts = Vec::with_capacity(way_data.nodes.len());
         let mut missing = false;
@@ -609,23 +701,26 @@ pub fn run_conversion(
             }
             pts.push(scaled_pt.to_pt());
         }
-        
+
         if missing || pts.is_empty() {
             continue;
         }
-        
+
         // Convert to fractional tile coordinates at zoom 16
-        let tile_pts: Vec<Pt> = pts.iter().map(|p| Pt {
-            x: lon_to_tile_x(p.x, 16),
-            y: lat_to_tile_y(p.y, 16),
-        }).collect();
-        
+        let tile_pts: Vec<Pt> = pts
+            .iter()
+            .map(|p| Pt {
+                x: lon_to_tile_x(p.x, 16),
+                y: lat_to_tile_y(p.y, 16),
+            })
+            .collect();
+
         // Find bounding box in tile coordinates
         let mut min_tx = tile_pts[0].x.floor() as u64;
         let mut max_tx = min_tx;
         let mut min_ty = tile_pts[0].y.floor() as u64;
         let mut max_ty = min_ty;
-        
+
         for &p in &tile_pts[1..] {
             let tx = p.x.floor() as u64;
             let ty = p.y.floor() as u64;
@@ -634,13 +729,13 @@ pub fn run_conversion(
             min_ty = min_ty.min(ty);
             max_ty = max_ty.max(ty);
         }
-        
+
         if let Some((min_x, max_x, min_y, max_y)) = bbox {
             if max_tx < min_x || min_tx > max_x || max_ty < min_y || min_ty > max_y {
                 continue;
             }
         }
-        
+
         // Add to intersecting tiles
         for tx in min_tx..=max_tx {
             for ty in min_ty..=max_ty {
@@ -651,36 +746,45 @@ pub fn run_conversion(
                 }
                 // Bounds in local coordinates for tile (tx, ty)
                 // We add a 256 unit buffer (extent is 4096) to prevent edge cutoffs
-                let local_pts: Vec<Pt> = tile_pts.iter().map(|p| Pt {
-                    x: (p.x - tx as f64) * 4096.0,
-                    y: (p.y - ty as f64) * 4096.0,
-                }).collect();
-                
+                let local_pts: Vec<Pt> = tile_pts
+                    .iter()
+                    .map(|p| Pt {
+                        x: (p.x - tx as f64) * 4096.0,
+                        y: (p.y - ty as f64) * 4096.0,
+                    })
+                    .collect();
+
                 let xmin = -256.0;
                 let xmax = 4096.0 + 256.0;
                 let ymin = -256.0;
                 let ymax = 4096.0 + 256.0;
-                
+
                 match way_data.way_type {
                     WayType::Road { class } => {
                         let clipped_lines = clip_linestring(&local_pts, xmin, ymin, xmax, ymax);
                         if !clipped_lines.is_empty() {
-                            let entry = tile_geoms.entry((tx, ty)).or_insert_with(|| TileGeometries {
-                                roads: Vec::new(),
-                                water_polys: Vec::new(),
-                                water_lines: Vec::new(),
-                            });
+                            let entry =
+                                tile_geoms
+                                    .entry((tx, ty))
+                                    .or_insert_with(|| TileGeometries {
+                                        roads: Vec::new(),
+                                        water_polys: Vec::new(),
+                                        water_lines: Vec::new(),
+                                    });
                             entry.roads.push((class, clipped_lines));
                         }
                     }
                     WayType::Water => {
                         let clipped_poly = clip_polygon(&local_pts, xmin, ymin, xmax, ymax);
                         if clipped_poly.len() >= 3 {
-                            let entry = tile_geoms.entry((tx, ty)).or_insert_with(|| TileGeometries {
-                                roads: Vec::new(),
-                                water_polys: Vec::new(),
-                                water_lines: Vec::new(),
-                            });
+                            let entry =
+                                tile_geoms
+                                    .entry((tx, ty))
+                                    .or_insert_with(|| TileGeometries {
+                                        roads: Vec::new(),
+                                        water_polys: Vec::new(),
+                                        water_lines: Vec::new(),
+                                    });
                             entry.water_polys.push(clipped_poly);
                         }
                     }
@@ -688,11 +792,14 @@ pub fn run_conversion(
                         let clipped_lines = clip_linestring(&local_pts, xmin, ymin, xmax, ymax);
                         if !clipped_lines.is_empty() {
                             for line in clipped_lines {
-                                let entry = tile_geoms.entry((tx, ty)).or_insert_with(|| TileGeometries {
-                                    roads: Vec::new(),
-                                    water_polys: Vec::new(),
-                                    water_lines: Vec::new(),
-                                });
+                                let entry =
+                                    tile_geoms
+                                        .entry((tx, ty))
+                                        .or_insert_with(|| TileGeometries {
+                                            roads: Vec::new(),
+                                            water_polys: Vec::new(),
+                                            water_lines: Vec::new(),
+                                        });
                                 entry.water_lines.push(line);
                             }
                         }
@@ -708,7 +815,8 @@ pub fn run_conversion(
                         let cx = sum_x / local_pts.len() as f64;
                         let cy = sum_y / local_pts.len() as f64;
                         if cx >= xmin && cx <= xmax && cy >= ymin && cy <= ymax {
-                            poi_points.entry((tx, ty))
+                            poi_points
+                                .entry((tx, ty))
                                 .or_default()
                                 .push(Pt { x: cx, y: cy });
                         }
@@ -717,7 +825,7 @@ pub fn run_conversion(
             }
         }
     }
-    
+
     let _ = progress_tx.send(ProgressMessage::TileGenProgress {
         current: total_ways,
         total: total_ways,
@@ -727,9 +835,9 @@ pub fn run_conversion(
     // PASS 4: Compile Tiles & Write PMTiles Archive
     // ----------------------------------------------------
     let _ = progress_tx.send(ProgressMessage::WritingStart);
-    
+
     let mut pm_tiles = PMTiles::new(TileType::Mvt, PmCompression::GZip);
-    
+
     // Find all unique tile coordinates that contain roads, water, or POIs
     let mut all_tiles: FxHashSet<(u64, u64)> = FxHashSet::default();
     for &k in tile_geoms.keys() {
@@ -738,20 +846,20 @@ pub fn run_conversion(
     for &k in poi_points.keys() {
         all_tiles.insert(k);
     }
-    
+
     let _total_tiles = all_tiles.len();
     let mut tiles_written = 0;
-    
+
     for (tx, ty) in all_tiles {
         let mut mvt_tile = MvtTile::new(4096);
-        
+
         let has_geom = tile_geoms.contains_key(&(tx, ty));
         let has_pois = poi_points.contains_key(&(tx, ty));
-        
+
         if !has_geom && !has_pois {
             continue;
         }
-        
+
         // 1. Add Water Layer
         if let Some(geoms) = tile_geoms.get(&(tx, ty)) {
             if !geoms.water_polys.is_empty() || !geoms.water_lines.is_empty() {
@@ -781,7 +889,7 @@ pub fn run_conversion(
                 let _ = mvt_tile.add_layer(layer);
             }
         }
-        
+
         // 2. Add Roads Layer
         if let Some(geoms) = tile_geoms.get(&(tx, ty)) {
             if !geoms.roads.is_empty() {
@@ -802,7 +910,7 @@ pub fn run_conversion(
                 let _ = mvt_tile.add_layer(layer);
             }
         }
-        
+
         // 3. Add POI Layer
         if let Some(pois) = poi_points.get(&(tx, ty)) {
             if !pois.is_empty() {
@@ -817,7 +925,7 @@ pub fn run_conversion(
                 let _ = mvt_tile.add_layer(layer);
             }
         }
-        
+
         // Encode MVT and Gzip compress it
         if let Ok(mvt_bytes) = mvt_tile.to_bytes() {
             if let Ok(compressed) = gzip_compress(&mvt_bytes) {
@@ -827,17 +935,20 @@ pub fn run_conversion(
             }
         }
     }
-    
+
     // Write PMTiles to file
-    let file = File::create(output_file).map_err(|e| format!("Failed to create output PMTiles file: {}", e))?;
+    let file = File::create(output_file)
+        .map_err(|e| format!("Failed to create output PMTiles file: {}", e))?;
     let mut writer = BufWriter::new(file);
-    pm_tiles.to_writer(&mut writer).map_err(|e| format!("Failed to write PMTiles archive: {}", e))?;
-    
+    pm_tiles
+        .to_writer(&mut writer)
+        .map_err(|e| format!("Failed to write PMTiles archive: {}", e))?;
+
     let _ = progress_tx.send(ProgressMessage::Complete {
         output_file: output_file.to_path_buf(),
         total_tiles: tiles_written,
     });
-    
+
     Ok(())
 }
 
@@ -854,20 +965,17 @@ mod tests {
         }
         let out_path = PathBuf::from("../target/data/tmp/monaco_test.pmtiles");
         let (tx, rx) = std::sync::mpsc::channel();
-        
-        let handle = std::thread::spawn(move || {
-            while let Ok(_) = rx.recv() {}
-        });
-        
+
+        let handle = std::thread::spawn(move || while let Ok(_) = rx.recv() {});
+
         let result = run_conversion(&[pbf_path], &out_path, true, true, None, tx);
         assert!(result.is_ok(), "Conversion failed: {:?}", result);
         assert!(out_path.exists(), "Output file does not exist");
-        
+
         let file_meta = std::fs::metadata(&out_path).unwrap();
         assert!(file_meta.len() > 0, "Output file is empty");
-        
+
         let _ = std::fs::remove_file(out_path);
         let _ = handle.join();
     }
 }
-
