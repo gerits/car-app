@@ -6,18 +6,20 @@ set -e
 echo "=== Car App Local Map Launcher ==="
 echo "Searching for available map files (*.mbtiles, *.pmtiles)..."
 
-# Find all map files in the workspace, excluding target and hidden directories
+# Find all map files in the workspace, excluding target (except target/assets and target/data) and hidden directories
 MAP_FILES=()
 while IFS= read -r file; do
     if [ -f "$file" ]; then
         MAP_FILES+=("$file")
     fi
-done < <(find . \( -name "*.mbtiles" -o -name "*.pmtiles" \) -not -path "*/target/*" -not -path "*/.*" | sort)
+done < <( { find . \( -name "*.mbtiles" -o -name "*.pmtiles" \) -not -path "*/target/*" -not -path "*/.*" ; \
+           if [ -d "target/assets" ]; then find target/assets \( -name "*.mbtiles" -o -name "*.pmtiles" \) -not -path "*/.*"; fi; \
+           if [ -d "target/data" ]; then find target/data \( -name "*.mbtiles" -o -name "*.pmtiles" \) -not -path "*/.*"; fi; } | sort -u )
 
 # Check if we found any maps
 if [ ${#MAP_FILES[@]} -eq 0 ]; then
     echo "No map files found in the repository."
-    echo "Using default/baked-in test map (assets/map.mbtiles)."
+    echo "Using default/baked-in test map (car-app/assets/map.mbtiles)."
     echo "Running: cargo run --bin car-app"
     cargo run --bin car-app
     exit 0
@@ -25,13 +27,13 @@ fi
 
 echo ""
 echo "Select which map to run the car-app with:"
-echo "1) Default/baked-in test map (assets/map.mbtiles)"
+echo "1) Default/baked-in test map (car-app/assets/map.mbtiles)"
 
 # Display other choices
 index=2
 for file in "${MAP_FILES[@]}"; do
-    # Skip assets/map.mbtiles from the search list since it's choice 1
-    if [ "$file" = "./assets/map.mbtiles" ] || [ "$file" = "assets/map.mbtiles" ]; then
+    # Skip car-app/assets/map.mbtiles from the search list since it's choice 1
+    if [ "$file" = "./car-app/assets/map.mbtiles" ] || [ "$file" = "car-app/assets/map.mbtiles" ]; then
         continue
     fi
     echo "$index) $file"
@@ -54,7 +56,7 @@ else
     current_choice=2
     selected_file=""
     for file in "${MAP_FILES[@]}"; do
-        if [ "$file" = "./assets/map.mbtiles" ] || [ "$file" = "assets/map.mbtiles" ]; then
+        if [ "$file" = "./car-app/assets/map.mbtiles" ] || [ "$file" = "car-app/assets/map.mbtiles" ]; then
             continue
         fi
         if [ "$current_choice" -eq "$choice" ]; then

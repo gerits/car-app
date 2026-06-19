@@ -847,12 +847,12 @@ mod tests {
 
     #[test]
     fn test_monaco_conversion() {
-        let pbf_path = PathBuf::from("../data/tmp/monaco-latest.osm.pbf");
+        let pbf_path = PathBuf::from("../target/data/tmp/monaco-latest.osm.pbf");
         if !pbf_path.exists() {
             // Skip the test if Monaco PBF wasn't downloaded (e.g. inside CI without network)
             return;
         }
-        let out_path = PathBuf::from("../data/tmp/monaco_test.pmtiles");
+        let out_path = PathBuf::from("../target/data/tmp/monaco_test.pmtiles");
         let (tx, rx) = std::sync::mpsc::channel();
         
         let handle = std::thread::spawn(move || {

@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Diepenbeek bounding box active: {:?}", bbox);
             }
 
-            let output_file = Path::new("assets/map.mbtiles");
+            let output_file = Path::new("target/assets/map.mbtiles");
             println!("Output PMTiles: {:?}", output_file);
 
             let (tx, rx) = channel();
@@ -594,7 +594,7 @@ fn run_app<B: ratatui::backend::Backend>(
 
                                         // Spawn processing thread
                                         thread::spawn(move || {
-                                            let download_dir = Path::new("data/tmp");
+                                            let download_dir = Path::new("target/data/tmp");
                                             let _ = fs::create_dir_all(download_dir);
 
                                             for (name, path) in countries_info {
@@ -620,7 +620,7 @@ fn run_app<B: ratatui::backend::Backend>(
                                                 paths.push(dest_path);
                                             }
 
-                                            let output_file = Path::new("assets/map.mbtiles");
+                                            let output_file = Path::new("target/assets/map.mbtiles");
                                             let _ = fs::create_dir_all(output_file.parent().unwrap());
 
                                             if let Err(e) = run_conversion(
