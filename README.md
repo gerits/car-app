@@ -21,43 +21,43 @@ The `car-app` is designed to demonstrate a modern, fluid automotive interface. I
 
 
 ### Building and Running
-The project includes a `Makefile` to simplify common development tasks.
+The project includes a `justfile` to simplify common development tasks using the [just](https://github.com/casey/just) command runner.
 
-To display all available targets and descriptions:
+To display all available recipes and descriptions:
 ```bash
-make help
+just
 ```
 
 To build the workspace:
 ```bash
-make build
+just build
 ```
 
 To run the application with the default map:
 ```bash
-make run
+just run
 ```
 
 To run the application with interactive map selection:
 ```bash
-make run-interactive
+just run-interactive
 ```
 
 To run the application with a specific map file:
 ```bash
-make run MAP=path/to/map.pmtiles
+just run path/to/map.pmtiles
 ```
 
 To run formatting, linting, or tests:
 ```bash
-make fmt
-make lint
-make test
+just fmt
+just lint
+just test
 ```
 
 To build for production with optimizations:
 ```bash
-make build-release
+just build-release
 ```
 ## Ubiquitous Language
 This project adheres to a shared vocabulary to ensure consistency across the design and code.

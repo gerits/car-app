@@ -26,6 +26,9 @@ jobs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       
+    - name: Install Just
+      uses: extractions/setup-just@v4
+      
     - name: Cache Cargo registry and build
       uses: actions/cache@v4
       with:
@@ -40,15 +43,15 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Check Formatting
-      run: make fmt-check
+      run: just fmt-check
 
     - name: Lint
-      run: make lint
+      run: just lint
 
     - name: Build
-      run: make build
+      run: just build
 
     - name: Run Tests
-      run: make test
+      run: just test
 
 
