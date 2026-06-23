@@ -709,7 +709,9 @@ fn run_app<B: ratatui::backend::Backend>(
                             ref error,
                             ..
                         } => {
-                            if (*complete || error.is_some()) && (key.code == KeyCode::Enter || key.code == KeyCode::Esc) {
+                            if (*complete || error.is_some())
+                                && (key.code == KeyCode::Enter || key.code == KeyCode::Esc)
+                            {
                                 app.progress_rx = None;
                                 app.screen = Screen::ContinentSelect { continent_index: 0 };
                             }

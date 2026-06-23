@@ -509,7 +509,9 @@ pub fn run_conversion(
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
 
-                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y) {
+                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| {
+                            tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
+                        }) {
                             return;
                         }
 
@@ -530,7 +532,9 @@ pub fn run_conversion(
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
 
-                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y) {
+                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| {
+                            tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
+                        }) {
                             return;
                         }
 
@@ -727,14 +731,18 @@ pub fn run_conversion(
             max_ty = max_ty.max(ty);
         }
 
-        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| max_tx < min_x || min_tx > max_x || max_ty < min_y || min_ty > max_y) {
+        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| {
+            max_tx < min_x || min_tx > max_x || max_ty < min_y || min_ty > max_y
+        }) {
             continue;
         }
 
         // Add to intersecting tiles
         for tx in min_tx..=max_tx {
             for ty in min_ty..=max_ty {
-                if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tx < min_x || tx > max_x || ty < min_y || ty > max_y) {
+                if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| {
+                    tx < min_x || tx > max_x || ty < min_y || ty > max_y
+                }) {
                     continue;
                 }
                 // Bounds in local coordinates for tile (tx, ty)
@@ -854,7 +862,10 @@ pub fn run_conversion(
         }
 
         // 1. Add Water Layer
-        if let Some(geoms) = tile_geoms.get(&(tx, ty)).filter(|g| !g.water_polys.is_empty() || !g.water_lines.is_empty()) {
+        if let Some(geoms) = tile_geoms
+            .get(&(tx, ty))
+            .filter(|g| !g.water_polys.is_empty() || !g.water_lines.is_empty())
+        {
             let mut layer = mvt_tile.create_layer("water");
             // Add polygons
             for poly in &geoms.water_polys {
@@ -914,7 +925,11 @@ pub fn run_conversion(
         }
 
         // Encode MVT and Gzip compress it
-        if let Some(compressed) = mvt_tile.to_bytes().ok().and_then(|bytes| gzip_compress(&bytes).ok()) {
+        if let Some(compressed) = mvt_tile
+            .to_bytes()
+            .ok()
+            .and_then(|bytes| gzip_compress(&bytes).ok())
+        {
             // Add to PMTiles builder
             let _ = pm_tiles.add_tile(tile_id(16, tx, ty), compressed);
             tiles_written += 1;
