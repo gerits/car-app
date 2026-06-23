@@ -518,6 +518,7 @@ fn run_app<B: ratatui::backend::Backend>(
         }
 
         // Poll for inputs
+        #[allow(clippy::collapsible_if)]
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
@@ -526,15 +527,11 @@ fn run_app<B: ratatui::backend::Backend>(
                             ref mut continent_index,
                         } => match key.code {
                             KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                            KeyCode::Up => {
-                                if *continent_index > 0 {
-                                    *continent_index -= 1;
-                                }
+                            KeyCode::Up if *continent_index > 0 => {
+                                *continent_index -= 1;
                             }
-                            KeyCode::Down => {
-                                if *continent_index < CONTINENTS.len() - 1 {
-                                    *continent_index += 1;
-                                }
+                            KeyCode::Down if *continent_index < CONTINENTS.len() - 1 => {
+                                *continent_index += 1;
                             }
                             KeyCode::Enter => {
                                 let selections =
@@ -555,15 +552,11 @@ fn run_app<B: ratatui::backend::Backend>(
                             KeyCode::Esc => {
                                 app.screen = Screen::ContinentSelect { continent_index };
                             }
-                            KeyCode::Up => {
-                                if *cursor_index > 0 {
-                                    *cursor_index -= 1;
-                                }
+                            KeyCode::Up if *cursor_index > 0 => {
+                                *cursor_index -= 1;
                             }
-                            KeyCode::Down => {
-                                if *cursor_index < selections.len() - 1 {
-                                    *cursor_index += 1;
-                                }
+                            KeyCode::Down if *cursor_index < selections.len() - 1 => {
+                                *cursor_index += 1;
                             }
                             KeyCode::Char(' ') => {
                                 selections[*cursor_index] = !selections[*cursor_index];
@@ -610,15 +603,11 @@ fn run_app<B: ratatui::backend::Backend>(
                                     selections: selections.clone(),
                                 };
                             }
-                            KeyCode::Up => {
-                                if *cursor_index > 0 {
-                                    *cursor_index -= 1;
-                                }
+                            KeyCode::Up if *cursor_index > 0 => {
+                                *cursor_index -= 1;
                             }
-                            KeyCode::Down => {
-                                if *cursor_index < 2 {
-                                    *cursor_index += 1;
-                                }
+                            KeyCode::Down if *cursor_index < 2 => {
+                                *cursor_index += 1;
                             }
                             KeyCode::Char(' ') => {
                                 if *cursor_index == 0 {
@@ -720,11 +709,9 @@ fn run_app<B: ratatui::backend::Backend>(
                             ref error,
                             ..
                         } => {
-                            if *complete || error.is_some() {
-                                if key.code == KeyCode::Enter || key.code == KeyCode::Esc {
-                                    app.progress_rx = None;
-                                    app.screen = Screen::ContinentSelect { continent_index: 0 };
-                                }
+                            if (*complete || error.is_some()) && (key.code == KeyCode::Enter || key.code == KeyCode::Esc) {
+                                app.progress_rx = None;
+                                app.screen = Screen::ContinentSelect { continent_index: 0 };
                             }
                         }
                     }

@@ -145,6 +145,12 @@ pub struct MockVehicleSystem {
     blinker_bulb_on: bool,
 }
 
+impl Default for MockVehicleSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockVehicleSystem {
     /// Creates a new `MockVehicleSystem`.
     pub fn new() -> Self {
@@ -276,7 +282,7 @@ impl IgnitionLightSensor for MockVehicleSystem {
 /// Supports a fixed decimal place in the 6th element (tenths of a kilometer).
 pub fn format_odometer(km: f64) -> Vec<slint::SharedString> {
     let tenths = (km * 10.0).round() as i64;
-    let tenths = tenths.max(0).min(999999);
+    let tenths = tenths.clamp(0, 999999);
     let s = format!("{:06}", tenths);
     s.chars()
         .map(|c| slint::SharedString::from(c.to_string()))

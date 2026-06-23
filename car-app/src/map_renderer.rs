@@ -69,6 +69,7 @@ pub struct MapView {
     pub camera_zoom: f32,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_map(
     offset_x: f32,
     offset_y: f32,

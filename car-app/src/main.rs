@@ -72,6 +72,7 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.set_current_world_y(21962.0);
 
     // Define waypoints and precompute cumulative segment distances for the driving loop
+    #[allow(clippy::excessive_precision)]
     const WAYPOINTS: &[(f32, f32)] = &[
         (33754.7859, 21966.5124),
         (33754.6452, 21966.3007),
@@ -537,10 +538,10 @@ mod tests {
     #[test]
     fn test_calculate_simulated_speed() {
         let s0 = calculate_simulated_speed(0.0);
-        assert!(s0 >= 30 && s0 <= 70);
+        assert!((30..=70).contains(&s0));
 
         let s_pi = calculate_simulated_speed(std::f32::consts::PI);
-        assert!(s_pi >= 30 && s_pi <= 70);
+        assert!((30..=70).contains(&s_pi));
     }
     #[test]
     fn test_is_night_time() {

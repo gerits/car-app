@@ -123,7 +123,7 @@ impl ScaledPt {
         }
     }
 
-    pub fn to_pt(&self) -> Pt {
+    pub fn to_pt(self) -> Pt {
         Pt {
             x: self.lon_scaled as f64 / 1e7,
             y: self.lat_scaled as f64 / 1e7,
@@ -240,23 +240,25 @@ fn get_way_type<'a>(
         }
     }
 
-    if is_road {
-        if let Some(val) = highway_val {
-            return Some(WayType::Road {
-                class: classify_highway(val),
-            });
-        }
+    if let Some(val) = highway_val.filter(|_| is_road) {
+        return Some(WayType::Road {
+            class: classify_highway(val),
+        });
     }
 
     // A waterway feature is either tagged with a "waterway" key,
     // or tagged with "natural=water" with a "water" sub-tag of river, canal, stream, ditch, lock, or riverbank.
     let is_waterway_feature = has_waterway
         || (has_natural_water
-            && match water_val {
-                Some("river") | Some("canal") | Some("stream") | Some("ditch") | Some("lock")
-                | Some("riverbank") => true,
-                _ => false,
-            });
+            && matches!(
+                water_val,
+                Some("river")
+                    | Some("canal")
+                    | Some("stream")
+                    | Some("ditch")
+                    | Some("lock")
+                    | Some("riverbank")
+            ));
 
     if is_waterway_feature {
         return Some(WayType::Waterway);
@@ -305,6 +307,7 @@ fn compute_out_code(x: f64, y: f64, xmin: f64, ymin: f64, xmax: f64, ymax: f64) 
     code
 }
 
+#[allow(clippy::too_many_arguments)]
 fn clip_segment(
     mut x0: f64,
     mut y0: f64,
@@ -506,11 +509,8 @@ pub fn run_conversion(
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
 
-                        if let Some((min_x, max_x, min_y, max_y)) = bbox {
-                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
-                            {
-                                return;
-                            }
+                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y) {
+                            return;
                         }
 
                         let local_x = (tx - tile_x as f64) * 4096.0;
@@ -530,11 +530,8 @@ pub fn run_conversion(
                         let tile_x = tx.floor() as u64;
                         let tile_y = ty.floor() as u64;
 
-                        if let Some((min_x, max_x, min_y, max_y)) = bbox {
-                            if tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y
-                            {
-                                return;
-                            }
+                        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tile_x < min_x || tile_x > max_x || tile_y < min_y || tile_y > max_y) {
+                            return;
                         }
 
                         let local_x = (tx - tile_x as f64) * 4096.0;
@@ -730,19 +727,15 @@ pub fn run_conversion(
             max_ty = max_ty.max(ty);
         }
 
-        if let Some((min_x, max_x, min_y, max_y)) = bbox {
-            if max_tx < min_x || min_tx > max_x || max_ty < min_y || min_ty > max_y {
-                continue;
-            }
+        if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| max_tx < min_x || min_tx > max_x || max_ty < min_y || min_ty > max_y) {
+            continue;
         }
 
         // Add to intersecting tiles
         for tx in min_tx..=max_tx {
             for ty in min_ty..=max_ty {
-                if let Some((min_x, max_x, min_y, max_y)) = bbox {
-                    if tx < min_x || tx > max_x || ty < min_y || ty > max_y {
-                        continue;
-                    }
+                if bbox.is_some_and(|(min_x, max_x, min_y, max_y)| tx < min_x || tx > max_x || ty < min_y || ty > max_y) {
+                    continue;
                 }
                 // Bounds in local coordinates for tile (tx, ty)
                 // We add a 256 unit buffer (extent is 4096) to prevent edge cutoffs
@@ -861,78 +854,70 @@ pub fn run_conversion(
         }
 
         // 1. Add Water Layer
-        if let Some(geoms) = tile_geoms.get(&(tx, ty)) {
-            if !geoms.water_polys.is_empty() || !geoms.water_lines.is_empty() {
-                let mut layer = mvt_tile.create_layer("water");
-                // Add polygons
-                for poly in &geoms.water_polys {
-                    let mut encoder = GeomEncoder::new(GeomType::Polygon);
-                    for p in poly {
-                        encoder = encoder.point(p.x, p.y).unwrap();
-                    }
-                    if let Ok(geom_data) = encoder.encode() {
-                        let feature = layer.into_feature(geom_data);
-                        layer = feature.into_layer();
-                    }
+        if let Some(geoms) = tile_geoms.get(&(tx, ty)).filter(|g| !g.water_polys.is_empty() || !g.water_lines.is_empty()) {
+            let mut layer = mvt_tile.create_layer("water");
+            // Add polygons
+            for poly in &geoms.water_polys {
+                let mut encoder = GeomEncoder::new(GeomType::Polygon);
+                for p in poly {
+                    encoder = encoder.point(p.x, p.y).unwrap();
                 }
-                // Add linestrings (waterways)
-                for line in &geoms.water_lines {
+                if let Ok(geom_data) = encoder.encode() {
+                    let feature = layer.into_feature(geom_data);
+                    layer = feature.into_layer();
+                }
+            }
+            // Add linestrings (waterways)
+            for line in &geoms.water_lines {
+                let mut encoder = GeomEncoder::new(GeomType::Linestring);
+                for p in line {
+                    encoder = encoder.point(p.x, p.y).unwrap();
+                }
+                if let Ok(geom_data) = encoder.encode() {
+                    let feature = layer.into_feature(geom_data);
+                    layer = feature.into_layer();
+                }
+            }
+            let _ = mvt_tile.add_layer(layer);
+        }
+
+        // 2. Add Roads Layer
+        if let Some(geoms) = tile_geoms.get(&(tx, ty)).filter(|g| !g.roads.is_empty()) {
+            let mut layer = mvt_tile.create_layer("roads");
+            for (class, lines) in &geoms.roads {
+                for line in lines {
                     let mut encoder = GeomEncoder::new(GeomType::Linestring);
                     for p in line {
                         encoder = encoder.point(p.x, p.y).unwrap();
                     }
                     if let Ok(geom_data) = encoder.encode() {
-                        let feature = layer.into_feature(geom_data);
+                        let mut feature = layer.into_feature(geom_data);
+                        feature.add_tag_string("class", class.as_str());
                         layer = feature.into_layer();
                     }
                 }
-                let _ = mvt_tile.add_layer(layer);
             }
-        }
-
-        // 2. Add Roads Layer
-        if let Some(geoms) = tile_geoms.get(&(tx, ty)) {
-            if !geoms.roads.is_empty() {
-                let mut layer = mvt_tile.create_layer("roads");
-                for (class, lines) in &geoms.roads {
-                    for line in lines {
-                        let mut encoder = GeomEncoder::new(GeomType::Linestring);
-                        for p in line {
-                            encoder = encoder.point(p.x, p.y).unwrap();
-                        }
-                        if let Ok(geom_data) = encoder.encode() {
-                            let mut feature = layer.into_feature(geom_data);
-                            feature.add_tag_string("class", class.as_str());
-                            layer = feature.into_layer();
-                        }
-                    }
-                }
-                let _ = mvt_tile.add_layer(layer);
-            }
+            let _ = mvt_tile.add_layer(layer);
         }
 
         // 3. Add POI Layer
-        if let Some(pois) = poi_points.get(&(tx, ty)) {
-            if !pois.is_empty() {
-                let mut layer = mvt_tile.create_layer("poi");
-                for p in pois {
-                    let encoder = GeomEncoder::new(GeomType::Point);
-                    if let Ok(geom_data) = encoder.point(p.x, p.y).unwrap().encode() {
-                        let feature = layer.into_feature(geom_data);
-                        layer = feature.into_layer();
-                    }
+        if let Some(pois) = poi_points.get(&(tx, ty)).filter(|p| !p.is_empty()) {
+            let mut layer = mvt_tile.create_layer("poi");
+            for p in pois {
+                let encoder = GeomEncoder::new(GeomType::Point);
+                if let Ok(geom_data) = encoder.point(p.x, p.y).unwrap().encode() {
+                    let feature = layer.into_feature(geom_data);
+                    layer = feature.into_layer();
                 }
-                let _ = mvt_tile.add_layer(layer);
             }
+            let _ = mvt_tile.add_layer(layer);
         }
 
         // Encode MVT and Gzip compress it
-        if let Ok(mvt_bytes) = mvt_tile.to_bytes() {
-            if let Ok(compressed) = gzip_compress(&mvt_bytes) {
-                // Add to PMTiles builder
-                let _ = pm_tiles.add_tile(tile_id(16, tx, ty), compressed);
-                tiles_written += 1;
-            }
+        if let Some(compressed) = mvt_tile.to_bytes().ok().and_then(|bytes| gzip_compress(&bytes).ok()) {
+            // Add to PMTiles builder
+            let _ = pm_tiles.add_tile(tile_id(16, tx, ty), compressed);
+            tiles_written += 1;
         }
     }
 
@@ -966,7 +951,7 @@ mod tests {
         let out_path = PathBuf::from("../target/data/tmp/monaco_test.pmtiles");
         let (tx, rx) = std::sync::mpsc::channel();
 
-        let handle = std::thread::spawn(move || while let Ok(_) = rx.recv() {});
+        let handle = std::thread::spawn(move || while rx.recv().is_ok() {});
 
         let result = run_conversion(&[pbf_path], &out_path, true, true, None, tx);
         assert!(result.is_ok(), "Conversion failed: {:?}", result);
