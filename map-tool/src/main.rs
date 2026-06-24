@@ -407,7 +407,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    B::Error: 'static,
+{
     loop {
         terminal.draw(|f| draw_ui(f, &app))?;
 
@@ -735,7 +738,7 @@ fn draw_ui(f: &mut Frame<'_>, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     // 1. Header
     let header_text = vec![Line::from(vec![
